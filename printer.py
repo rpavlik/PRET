@@ -758,6 +758,8 @@ class printer(cmd.Cmd, object):
     │ as it may be a security risk (CVE-2016–3714, 2016-7976). │
     └──────────────────────────────────────────────────────────┘
     '''
+    data = None
+    stderr = None
     try:
       self.chitchat("Converting '" + path + "' to " + pdl + " format")
       pdf = ['-density', '300'] if path.endswith('.pdf') else []
@@ -766,5 +768,5 @@ class printer(cmd.Cmd, object):
       p = subprocess.Popen(cmd, stdout=out, stderr=err)
       data, stderr = p.communicate()
     except: stderr = "ImageMagick or Ghostscript missing"
-    if stderr: output().errmsg("Cannot convert", stderr)
+    if data is None or stderr: output().errmsg("Cannot convert", stderr)
     else: return data
