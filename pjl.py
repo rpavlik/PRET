@@ -59,7 +59,7 @@ class pjl(printer):
       self.cmd('@PJL USTATUSOFF', False) # disable status messages
 
   # ------------------------[ status ]----------------------------------
-  def do_status(self, arg):
+  def do_status(self, arg: str):
     "Enable status messages."
     self.status = not self.status
     print(("Status messages enabled" if self.status else "Status messages disabled"))
@@ -192,7 +192,7 @@ class pjl(printer):
     return list
 
   # ------------------------[ ls <path> ]-------------------------------
-  def do_ls(self, arg):
+  def do_ls(self, arg: str):
     "List contents of remote directory:  ls <path>"
     list = self.dirlist(arg, False, True)
     # remove '.' and '..' from non-empty directories
@@ -205,7 +205,7 @@ class pjl(printer):
   # ====================================================================
 
   # ------------------------[ mkdir <path> ]----------------------------
-  def do_mkdir(self, arg):
+  def do_mkdir(self, arg: str):
     "Create remote directory:  mkdir <path>"
     if not arg:
       arg = eval(input("Directory: "))
@@ -242,12 +242,12 @@ class pjl(printer):
     self.cmd('@PJL FSDELETE NAME="' + path + '"', False)
 
   # ------------------------[ find <path> ]-----------------------------
-  def do_find(self, arg):
+  def do_find(self, arg: str):
     "Recursively list contents of directory:  find <path>"
     self.fswalk(arg, 'find')
 
   # ------------------------[ mirror <local path> ]---------------------
-  def do_mirror(self, arg):
+  def do_mirror(self, arg: str):
     "Mirror remote file system to local directory:  mirror <remote path>"
     print(("Creating mirror of " + c.SEP + self.vpath(arg)))
     self.fswalk(arg, 'mirror')
@@ -277,17 +277,17 @@ class pjl(printer):
     self.do_info('id')
 
   # ------------------------[ df ]--------------------------------------
-  def do_df(self, arg):
+  def do_df(self, arg: str):
     "Show volume information (alias for 'info filesys')."
     self.do_info('filesys')
 
   # ------------------------[ free ]------------------------------------
-  def do_free(self, arg):
+  def do_free(self, arg: str):
     "Show available memory (alias for 'info memory')."
     self.do_info('memory')
 
   # ------------------------[ env ]-------------------------------------
-  def do_env(self, arg):
+  def do_env(self, arg: str):
     "Show environment variables (alias for 'info variables')."
     self.do_info('variables', arg)
 
@@ -334,7 +334,7 @@ class pjl(printer):
     return [cat for cat in self.options_info if cat.startswith(text)]
 
   # ------------------------[ printenv <variable> ]---------------------
-  def do_printenv(self, arg):
+  def do_printenv(self, arg: str):
     "Show printer environment variable:  printenv <VAR>"
     str_recv = self.cmd('@PJL INFO VARIABLES')
     variables = []
@@ -372,7 +372,7 @@ class pjl(printer):
     if fb: self.onecmd('printenv ' + re.split("=", arg, 1)[0])
 
   # ------------------------[ pagecount <number> ]----------------------
-  def do_pagecount(self, arg):
+  def do_pagecount(self, arg: str):
     "Manipulate printer's page counter:  pagecount <number>"
     if not arg:
       output().raw("Hardware page counter: ", '')
@@ -395,7 +395,7 @@ class pjl(printer):
   # ====================================================================
 
   # ------------------------[ display <message> ]-----------------------
-  def do_display(self, arg):
+  def do_display(self, arg: str):
     "Set printer's display message:  display <message>"
     if not arg:
       arg = eval(input("Message: "))
@@ -404,7 +404,7 @@ class pjl(printer):
     self.cmd('@PJL RDYMSG DISPLAY="' + arg + '"', False)
 
   # ------------------------[ offline <message> ]-----------------------
-  def do_offline(self, arg):
+  def do_offline(self, arg: str):
     "Take printer offline and display message:  offline <message>"
     if not arg:
       arg = eval(input("Offline display message: "))
@@ -415,7 +415,7 @@ class pjl(printer):
       self.cmd('@PJL OPMSG DISPLAY="' + arg + '"', False)
 
   # ------------------------[ restart ]---------------------------------
-  def do_restart(self, arg):
+  def do_restart(self, arg: str):
     "Restart printer."
     output().raw("Trying to restart the device via PML (Printer Managment Language)")
     self.cmd('@PJL DMCMD ASCIIHEX="040006020501010301040104"', False)
@@ -424,7 +424,7 @@ class pjl(printer):
       output().chitchat("snmpset -v1 -c public " + self.target + " 1.3.6.1.2.1.43.5.1.1.3.1 i 4")
 
   # ------------------------[ reset ]-----------------------------------
-  def do_reset(self, arg):
+  def do_reset(self, arg: str):
     "Reset to factory defaults."
     if not self.conn._file: # in case we're connected over inet socket
       output().warning("Warning: This may also reset TCP/IP settings to factory defaults.")
@@ -447,7 +447,7 @@ class pjl(printer):
         output().chitchat("snmpset -v1 -c public " + self.target + " 1.3.6.1.2.1.43.5.1.1.3.1 i 6")
 
   # ------------------------[ selftest ]--------------------------------
-  def do_selftest(self, arg):
+  def do_selftest(self, arg: str):
     "Perform various printer self-tests."
     # pjl-based testpage commands
     pjltests = ['SELFTEST',                 # pcl self-test 
@@ -485,7 +485,7 @@ class pjl(printer):
            + '@PJL EXECUTE PRTCONFIG', False)
 
   # ------------------------[ format ]----------------------------------
-  def do_format(self, arg):
+  def do_format(self, arg: str):
     "Initialize printer's mass storage file system."
     output().warning("Warning: Initializing the printer's file system will whipe-out all")
     output().warning("user data (e.g. stored jobs) on the volume. Press CTRL+C to abort.")
@@ -493,7 +493,7 @@ class pjl(printer):
       self.cmd('@PJL FSINIT VOLUME="' + self.vol[0] + '"', False)
 
   # ------------------------[ disable ]---------------------------------
-  def do_disable(self, arg):
+  def do_disable(self, arg: str):
     jobmedia = self.cmd('@PJL DINQUIRE JOBMEDIA') or '?'
     if '?' in jobmedia: return output().info("Not available")
     elif 'ON' in jobmedia: self.do_set('JOBMEDIA=OFF', False)
@@ -507,7 +507,7 @@ class pjl(printer):
     print("Disable printing functionality.")
 
   # ------------------------[ destroy ]---------------------------------
-  def do_destroy(self, arg):
+  def do_destroy(self, arg: str):
     "Cause physical damage to printer's NVRAM."
     output().warning("Warning: This command tries to cause physical damage to the")
     output().warning("printer NVRAM. Use at your own risk. Press CTRL+C to abort.")
@@ -536,7 +536,7 @@ class pjl(printer):
     print() # echo newline if we get this far
 
   # ------------------------[ hold ]------------------------------------
-  def do_hold(self, arg):
+  def do_hold(self, arg: str):
     "Enable job retention."
     self.chitchat("Setting job retention, reconnecting to see if still enabled")
     self.do_set('HOLD=ON', False)
@@ -550,7 +550,7 @@ class pjl(printer):
 
   # ------------------------[ nvram <operation> ]-----------------------
   # nvram operations (brother-specific)
-  def do_nvram(self, arg):
+  def do_nvram(self, arg: str):
     # dump nvram
     if arg.startswith('dump'):
       bs = 2**9    # memory block size used for sampling
@@ -620,7 +620,7 @@ class pjl(printer):
   # ====================================================================
 
   # ------------------------[ lock <pin> ]------------------------------
-  def do_lock(self, arg):
+  def do_lock(self, arg: str):
     "Lock control panel settings and disk write access."
     if not arg:
       arg = eval(input("Enter PIN (1..65535): "))
@@ -641,7 +641,7 @@ class pjl(printer):
     output().info("Disk lock:       " + disklock)
 
   # ------------------------[ unlock <pin> ]----------------------------
-  def do_unlock(self, arg):
+  def do_unlock(self, arg: str):
     "Unlock control panel settings and disk write access."
     # first check if locking is supported by device
     str_recv = self.cmd('@PJL DINQUIRE PASSWORD')
@@ -690,7 +690,7 @@ class pjl(printer):
   # ====================================================================
 
   # ------------------------[ flood <size> ]----------------------------
-  def do_flood(self, arg):
+  def do_flood(self, arg: str):
     "Flood user input, may reveal buffer overflows: flood <size>"
     size = conv().int(arg) or 10000 # buffer size
     char = '0' # character to fill the user input

@@ -75,7 +75,7 @@ class postscript(printer):
         output().errmsg('No feedback', 'Printer busy, non-ps or silent')
 
   # ------------------------[ shell ]-----------------------------------
-  def do_shell(self, arg):
+  def do_shell(self, arg: str):
     "Open interactive PostScript shell."
     # politely request poor man's remote postscript shell
     output().info("Launching PostScript shell. Press CTRL+D to exit.")
@@ -158,7 +158,7 @@ class postscript(printer):
     return self.timeoutcmd(str_send, self.timeout * 2, False)
 
   # ------------------------[ ls <path> ]-------------------------------
-  def do_ls(self, arg):
+  def do_ls(self, arg: str):
     "List contents of remote directory:  ls <path>"
     path = self.rpath(arg) + self.get_sep(arg)
     list = self.dirlist(arg)
@@ -182,13 +182,13 @@ class postscript(printer):
       else: output().errmsg("Crippled filename", 'Bad interpreter')
 
   # ------------------------[ find <path> ]-----------------------------
-  def do_find(self, arg):
+  def do_find(self, arg: str):
     "Recursively list contents of directory:  find <path>"
     for name in self.dirlist(arg):
       output().psfind(name)
 
   # ------------------------[ mirror <path> ]---------------------------
-  def do_mirror(self, arg):
+  def do_mirror(self, arg: str):
     "Mirror remote file system to local directory:  mirror <remote path>"
     for name in self.dirlist(arg):
       self.mirror(name, True)
@@ -196,7 +196,7 @@ class postscript(printer):
   # ====================================================================
 
   # ------------------------[ mkdir <path> ]----------------------------
-  def do_mkdir(self, arg):
+  def do_mkdir(self, arg: str):
     "Create remote directory:  mkdir <path>"
     if not arg:
       arg = eval(input("Directory: "))
@@ -241,11 +241,11 @@ class postscript(printer):
     self.cmd('(' + path.decode() + ') deletefile', False)
 
   # ------------------------[ rename <old> <new> ]----------------------
-  def do_rename(self, arg):
+  def do_rename(self, arg: str):
     arg = re.split(r"\s+", arg, 1)
     if len(arg) > 1:
-      old = self.rpath(arg[0])
-      new = self.rpath(arg[1])
+      old = self.rpath(arg[0].encode())
+      new = self.rpath(arg[1].encode())
       self.cmd('(' + old.decode() + ') (' + new.decode() + ') renamefile', False)
     else:
       self.onecmd("help rename")
@@ -284,7 +284,7 @@ class postscript(printer):
     output().info(self.cmd(str_send))
 
   # ------------------------[ df ]--------------------------------------
-  def do_df(self, arg):
+  def do_df(self, arg: str):
     "Show volume information."
     output().df(('VOLUME', 'TOTAL SIZE', 'FREE SPACE', 'PRIORITY',
     'REMOVABLE', 'MOUNTED', 'HASNAMES', 'WRITEABLE', 'SEARCHABLE'))
@@ -295,7 +295,7 @@ class postscript(printer):
       output().df(values)
 
   # ------------------------[ free ]------------------------------------
-  def do_free(self, arg):
+  def do_free(self, arg: str):
     "Show available memory."
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     output().raw("RAM status")
@@ -336,7 +336,7 @@ class postscript(printer):
                          + '(bsize:  ) print =='))
 
   # ------------------------[ devices ]---------------------------------
-  def do_devices(self, arg):
+  def do_devices(self, arg: str):
     "Show available I/O devices."
     str_send = '/str 128 string def (*) {print (\\n) print} str /IODevice resourceforall'
     for dev in self.cmd(str_send).splitlines():
@@ -345,14 +345,14 @@ class postscript(printer):
                           + 'cvs print (: ) print ==} forall').decode() + os.linesep)
 
   # ------------------------[ uptime ]----------------------------------
-  def do_uptime(self, arg):
+  def do_uptime(self, arg: str):
     "Show system uptime (might be random)."
     str_recv = self.cmd('realtime ==')
     try: output().info(conv().elapsed(str_recv, 1000))
     except ValueError: output().info("Not available")
 
   # ------------------------[ date ]------------------------------------
-  def do_date(self, arg):
+  def do_date(self, arg: str):
     "Show printer's system date and time."
     str_send = '(%Calendar%) /IODevice resourcestatus\n'\
                '{(%Calendar%) currentdevparams /DateTime get print}\n'\
@@ -361,7 +361,7 @@ class postscript(printer):
     output().info(str_recv)
 
   # ------------------------[ pagecount ]-------------------------------
-  def do_pagecount(self, arg):
+  def do_pagecount(self, arg: str):
     "Show printer's page counter:  pagecount <number>"
     output().raw("Hardware page counter: ", '')
     str_send = 'currentsystemparams dup /PageCount known\n'\
@@ -371,7 +371,7 @@ class postscript(printer):
   # ====================================================================
 
   # ------------------------[ lock <passwd> ]---------------------------
-  def do_lock(self, arg):
+  def do_lock(self, arg: str):
     "Set startjob and system parameters password."
     if not arg:
       arg = eval(input("Enter password: "))
@@ -381,7 +381,7 @@ class postscript(printer):
              '>> setsystemparams', False)
 
   # ------------------------[ unlock <passwd>|"bypass" ]----------------
-  def do_unlock(self, arg):
+  def do_unlock(self, arg: str):
     "Unset startjob and system parameters password."
     max = 2**20 # exhaustive key search max value
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -417,14 +417,14 @@ class postscript(printer):
     else: output().raw("Device unlocked with password: " + arg)
 
   # ------------------------[ restart ]---------------------------------
-  def do_restart(self, arg):
+  def do_restart(self, arg: str):
     "Restart PostScript interpreter."
     output().chitchat("Restarting PostScript interpreter.")
     # reset VM, might delete downloaded files and/or restart printer
     self.globalcmd('systemdict /quit get exec')
 
   # ------------------------[ reset ]-----------------------------------
-  def do_reset(self, arg):
+  def do_reset(self, arg: str):
     "Reset PostScript settings to factory defaults."
     # reset system parameters -- only works if printer is turned off
     ''' »A flag that, if set to true immediately before the printer is turned
@@ -439,7 +439,7 @@ class postscript(printer):
     output().raw("This can be accomplished, using the 'restart' command in PJL mode.")
 
   # ------------------------[ format ]----------------------------------
-  def do_format(self, arg):
+  def do_format(self, arg: str):
     "Initialize printer's file system:  format <disk>"
     if not self.vol:
       output().info("Set volume first using 'chvol'")
@@ -450,7 +450,7 @@ class postscript(printer):
         str_recv = self.cmd('statusdict begin (' + self.vol.decode() + ') () initializedisk end', False)
 
   # ------------------------[ disable ]---------------------------------
-  def do_disable(self, arg):
+  def do_disable(self, arg: str):
     output().psonly()
     before = b'true' in self.globalcmd('userdict /showpage known dup ==\n'
                                       '{userdict /showpage undef}\n'
@@ -466,7 +466,7 @@ class postscript(printer):
     print("Disable printing functionality.")
 
   # ------------------------[ destroy ]---------------------------------
-  def do_destroy(self, arg):
+  def do_destroy(self, arg: str):
     "Cause physical damage to printer's NVRAM."
     output().warning("Warning: This command tries to cause physical damage to the")
     output().warning("printer NVRAM. Use at your own risk. Press CTRL+C to abort.")
@@ -497,7 +497,7 @@ class postscript(printer):
       print() # echo newline if we get this far
 
   # ------------------------[ hang ]------------------------------------
-  def do_hang(self, arg):
+  def do_hang(self, arg: str):
     "Execute PostScript infinite loop."
     output().warning("Warning: This command causes an infinite loop rendering the")
     output().warning("device useless until manual restart. Press CTRL+C to abort.")
@@ -507,7 +507,7 @@ class postscript(printer):
   # ====================================================================
 
   # ------------------------[ overlay <file> ]--------------------------
-  def do_overlay(self, arg):
+  def do_overlay(self, arg: str):
     "Put overlay image on all hard copies:  overlay <file>"
     if not arg: arg = eval(input('File: '))
     if arg.endswith('ps'): data = file().read(arg) # already ps/eps file
@@ -534,7 +534,7 @@ class postscript(printer):
     self.globalcmd(str_send)
 
   # ------------------------[ cross <text> <font> ]---------------------
-  def do_cross(self, arg):
+  def do_cross(self, arg: str):
     arg = re.split(r"\s+", arg, 1)
     if len(arg) > 1 and arg[0] in self.options_cross:
       font, text = arg
@@ -562,7 +562,7 @@ class postscript(printer):
     return [cat for cat in self.options_cross if cat.startswith(text)]
 
   # ------------------------[ replace <old> <new> ]---------------------
-  def do_replace(self, arg):
+  def do_replace(self, arg: str):
     "Replace string in documents to be printed:  replace <old> <new>"
     arg = re.split("\s+", arg, 1)
     if len(arg) > 1:
@@ -585,7 +585,7 @@ class postscript(printer):
       self.onecmd("help replace")
 
   # ------------------------[ capture <operation> ]---------------------
-  def do_capture(self, arg):
+  def do_capture(self, arg: str):
     "Capture further jobs to be printed on this device."
     free = '5' # memory limit in megabytes that must at least be free to capture print jobs
     # record future print jobs
@@ -739,7 +739,7 @@ class postscript(printer):
     return [cat for cat in self.options_capture if cat.startswith(text)]
 
   # ------------------------[ hold ]------------------------------------
-  def do_hold(self, arg):
+  def do_hold(self, arg: str):
     "Enable job retention."
     output().psonly()
     str_send = 'currentpagedevice (CollateDetails) get (Hold) get 1 ne\n'\
@@ -804,7 +804,7 @@ class postscript(printer):
   # ====================================================================
 
   # ------------------------[ known <operator> ]-------------------------
-  def do_known(self, arg):
+  def do_known(self, arg: str):
     "List supported PostScript operators:  known <operator>"
     if arg:
       functionlist = {'User-supplied Operators': arg.split()}
@@ -823,12 +823,12 @@ class postscript(printer):
         output().green(line) if b" true" in line else output().warning(line)
 
   # ------------------------[ search <key> ]----------------------------
-  def do_search(self, arg):
+  def do_search(self, arg: str):
     "Search all dictionaries by key:  search <key>"
     output().info(self.cmd('(' + arg + ') where {(' + arg + ') get ==} if'))
 
   # ------------------------[ dicts ]-----------------------------------
-  def do_dicts(self, arg):
+  def do_dicts(self, arg: str):
     "Return a list of dictionaries and their permissions."
     output().info("acl   len   max   dictionary")
     output().info("────────────────────────────")
@@ -961,7 +961,7 @@ class postscript(printer):
     return str(string, errors='ignore')
 
   # ------------------------[ resource <category> [dump] ]--------------
-  def do_resource(self, arg):
+  def do_resource(self, arg: str):
     arg = re.split("\s+", arg, 1)
     cat, dump = arg[0], len(arg) > 1
     self.populate_resource()
@@ -993,7 +993,7 @@ class postscript(printer):
       self.options_resource = self.cmd(str_send).splitlines()
 
   # ------------------------[ set <key=value> ]-------------------------
-  def do_set(self, arg):
+  def do_set(self, arg: str):
     "Set key to value in topmost dictionary:  set <key=value>"
     arg = re.split("=", arg, 1)
     if len(arg) > 1:
@@ -1013,7 +1013,7 @@ class postscript(printer):
       self.onecmd("help set")
 
   # ------------------------[ config <setting> ]------------------------
-  def do_config(self, arg):
+  def do_config(self, arg: str):
     arg = re.split("\s+", arg, 1)
     (arg, val) = tuple(arg) if len(arg) > 1 else (arg[0], None)
     if arg in list(self.options_config.keys()):

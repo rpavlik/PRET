@@ -129,7 +129,7 @@ class printer(cmd.Cmd):
     print("Exit the interpreter.")
 
   # ------------------------[ debug ]-----------------------------------
-  def do_debug(self, arg):
+  def do_debug(self, arg: str):
     "Enter debug mode. Use 'hex' for hexdump:  debug [hex]"
     self.debug = not self.debug
     # set hex mode (= ascii + hexdump)
@@ -140,7 +140,7 @@ class printer(cmd.Cmd):
   # ====================================================================
 
   # ------------------------[ load ]------------------------------------
-  def do_load(self, arg):
+  def do_load(self, arg: str):
     "Run commands from file:  load cmd.txt"
     if not arg:
       arg = eval(input("File: "))
@@ -152,7 +152,7 @@ class printer(cmd.Cmd):
       self.onecmd(self.precmd(cmd))
 
   # ------------------------[ loop <cmd> <arg1> <arg2> … ]--------------
-  def do_loop(self, arg):
+  def do_loop(self, arg: str):
     "Run command for multiple arguments:  loop <cmd> <arg1> <arg2> …"
     args = re.split(rb"\s+", arg)
     if len(args) > 1:
@@ -166,7 +166,7 @@ class printer(cmd.Cmd):
   # ====================================================================
 
   # ------------------------[ discover ]--------------------------------
-  def do_discover(self, arg):
+  def do_discover(self, arg: str):
     "Discover local printer devices via SNMP."
     discovery()
 
@@ -270,13 +270,13 @@ class printer(cmd.Cmd):
   # ====================================================================
 
   # ------------------------[ pwd ]-------------------------------------
-  def do_pwd(self, arg):
+  def do_pwd(self, arg: str):
     "Show working directory on remote device."
     path = (b'' if self.vol else c.SEP) + self.rpath()
     output().raw(path)
 
   # ------------------------[ chvol <volume> ]--------------------------
-  def do_chvol(self, arg):
+  def do_chvol(self, arg: str):
     "Change remote volume:  chvol <volume>"
     if not arg:
       arg = eval(input("Volume: "))
@@ -317,7 +317,7 @@ class printer(cmd.Cmd):
   def file_exists(self, path: bytes) -> bool: raise NotImplementedError
 
   # ------------------------[ traversal <path> ]------------------------
-  def do_traversal(self, arg):
+  def do_traversal(self, arg: str):
     "Set path traversal:  traversal <path>"
     if not arg or self.dir_exists(self.tpath(arg)):
       self.set_traversal(arg)
@@ -331,7 +331,7 @@ class printer(cmd.Cmd):
     if not traversal: self.set_cwd()
 
   # ------------------------[ cd <path> ]-------------------------------
-  def do_cd(self, arg):
+  def do_cd(self, arg: str):
     "Change remote working directory:  cd <path>"
     if not self.cpath(arg) or self.dir_exists(self.rpath(arg)):
       if re.match(rb"^[\." + c.SEP + rb"]+$", self.cpath(arg)):
@@ -468,7 +468,7 @@ class printer(cmd.Cmd):
         self.size_mismatch(lsize, rsize)
 
   # ------------------------[ append <file> <string> ]------------------
-  def do_append(self, arg):
+  def do_append(self, arg: str):
     "Append to file:  append <file> <string>"
     arg = re.split(rb"\s+", arg, 1)
     if len(arg) > 1:
@@ -482,7 +482,7 @@ class printer(cmd.Cmd):
   def append(self, path, data): raise NotImplementedError
 
   # ------------------------[ touch <file> ]----------------------------
-  def do_touch(self, arg):
+  def do_touch(self, arg: str):
     "Update file timestamps:  touch <file>"
     if not arg:
       arg = eval(input("Remote file: "))
@@ -490,7 +490,7 @@ class printer(cmd.Cmd):
     self.append(rpath, '')
 
   # ------------------------[ delete <file> ]---------------------------
-  def do_delete(self, arg):
+  def do_delete(self, arg: str):
     if not arg:
       arg = eval(input("File: "))
     self.delete(arg)
@@ -504,7 +504,7 @@ class printer(cmd.Cmd):
   def delete(self, arg): raise NotImplementedError
 
   # ------------------------[ cat <file> ]------------------------------
-  def do_cat(self, arg):
+  def do_cat(self, arg: str):
     "Output remote file to stdout:  cat <file>"
     if not arg:
       arg = eval(input("Remote file: "))
@@ -515,7 +515,7 @@ class printer(cmd.Cmd):
       output().raw(data.strip())
 
   # ------------------------[ edit <file> ]-----------------------------
-  def do_edit(self, arg):
+  def do_edit(self, arg: str):
     # get name of temporary file
     t = tempfile.NamedTemporaryFile(delete=False)
     lpath = t.name; t.close
@@ -608,7 +608,7 @@ class printer(cmd.Cmd):
   # ====================================================================
 
   # ------------------------[ fuzz <category> ]-------------------------
-  def do_fuzz(self, arg):
+  def do_fuzz(self, arg: str):
     if arg in self.options_fuzz:
       # enable global fuzzing
       self.fuzz = True
@@ -760,7 +760,7 @@ class printer(cmd.Cmd):
   # ====================================================================
 
   # ------------------------[ site <command> ]--------------------------
-  def do_site(self, arg):
+  def do_site(self, arg: str):
     "Execute custom command on printer:  site <command>"
     if not arg:
       arg = eval(input("Command: "))
@@ -768,7 +768,7 @@ class printer(cmd.Cmd):
     output().info(str_recv)
 
   # ------------------------[ print <file>|"text" ]----------------------------
-  def do_print(self, arg):
+  def do_print(self, arg: str):
     'Print image file or raw text:  print <file>|"text"'
     '''
     ┌──────────────────────────────────────────────────────────┐

@@ -100,7 +100,7 @@ class pcl(printer):
     return pclfs
 
   # ------------------------[ ls ]--------------------------------------
-  def do_ls(self, arg):
+  def do_ls(self, arg: str):
     "List contents of virtual file system:  ls"
     pclfs = self.dirlist()
     if not pclfs: # no files have yet been uploaded
@@ -199,7 +199,7 @@ class pcl(printer):
   # ====================================================================
 
   # ------------------------[ info <category> ]-------------------------
-  def do_info(self, arg):
+  def do_info(self, arg: str):
     if arg in self.entities:
       entity, desc = self.entities[arg]
       for location in self.locations:
@@ -239,11 +239,11 @@ class pcl(printer):
   }
 
   # ------------------------[ df ]--------------------------------------
-  def do_free(self, arg):
+  def do_free(self, arg: str):
     "Show available memory."
     output().info(self.cmd('*s1M'))
 
   # ------------------------[ selftest ]--------------------------------
-  def do_selftest(self, arg):
+  def do_selftest(self, arg: str):
     "Perform printer self-test."
     output().info(self.cmd('z'))
