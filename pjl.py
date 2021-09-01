@@ -40,6 +40,7 @@ class pjl(printer):
 
     # handle CTRL+C and exceptions
     except (KeyboardInterrupt, Exception) as e:
+      if self.exceptions: raise
       if not self.fuzz or not str(e): self.reconnect(str(e))
       return ""
 

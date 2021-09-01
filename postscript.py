@@ -32,6 +32,8 @@ class postscript(printer):
 
     # handle CTRL+C and exceptions
     except (KeyboardInterrupt, Exception) as e:
+      if self.exceptions and not isinstance(e, KeyboardInterrupt):
+        raise
       self.reconnect(str(e))
       return b""
 

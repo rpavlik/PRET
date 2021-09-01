@@ -20,6 +20,7 @@ def usage():
   parser.add_argument("-s", "--safe", help="verify if language is supported", action="store_true")
   parser.add_argument("-q", "--quiet", help="suppress warnings and chit-chat", action="store_true")
   parser.add_argument("-d", "--debug", help="enter debug mode (show traffic)", action="store_true")
+  parser.add_argument("-e", "--exceptions", help="re-raise caught exceptions (for development)", action="store_true")
   parser.add_argument("-i", "--load", metavar="file", help="load and run commands from file")
   parser.add_argument("-o", "--log", metavar="file", help="log raw data sent to the target")
   if len(sys.argv) < 2: discovery(True) # list local printers if no arguments given at all

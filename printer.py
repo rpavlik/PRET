@@ -41,6 +41,7 @@ class printer(cmd.Cmd, object):
     self.debug = args.debug # debug mode
     self.quiet = args.quiet # quiet mode
     self.mode  = args.mode  # command mode
+    self.exceptions = args.exceptions
     # connect to device
     self.do_open(args.target, 'init')
     # log pjl/ps cmds to file
@@ -108,6 +109,8 @@ class printer(cmd.Cmd, object):
       cmd.Cmd.onecmd(self, line)
     except Exception as e:
       output().errmsg("Program Error", e)
+      if self.exceptions:
+        raise
 
   # ====================================================================
 
@@ -189,7 +192,9 @@ class printer(cmd.Cmd, object):
       # set printer default values
       self.set_defaults(newtarget)
     except Exception as e:
-      output().errmsg("Connection to " + arg + " failed", e)
+      output().errmsg("Connection to " + arg_bytes.decode() + " failed", e)
+      if self.exceptions:
+        raise
       self.do_close()
       # exit if run from init function (command line)
       if mode == 'init':
