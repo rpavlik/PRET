@@ -149,7 +149,7 @@ class printer(cmd.Cmd):
       # simulate command prompt
       print((self.prompt + cmd.decode()))
       # execute command with premcd
-      self.onecmd(self.precmd(cmd))
+      self.onecmd(self.precmd(cmd.decode()))
 
   # ------------------------[ loop <cmd> <arg1> <arg2> … ]--------------
   def do_loop(self, arg: str):

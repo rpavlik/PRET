@@ -72,6 +72,8 @@ class log():
 
   # write comment to logfile
   def comment(self, logfile, line):
+    if isinstance(line, bytes):
+      line = line.decode()
     comment = "%" + ("[ " + line + " ]").center(72, '-')
     self.write(logfile, os.linesep + comment + os.linesep)
 
@@ -151,7 +153,7 @@ class output():
     print("%s %s" % (vol, name))
 
   # show directory listing
-  def psdir(self, isdir, size, mtime, name, otime):
+  def psdir(self, isdir, size, mtime, name: str, otime):
     otime = Style.DIM + "(created " + otime + ")" + Style.RESET_ALL 
     vol = Style.DIM + Fore.YELLOW + item(re.findall("^(%.*%)", name)) + Style.RESET_ALL
     name = re.sub("^(%.*%)", '', name) # remove volume information from filename

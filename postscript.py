@@ -109,18 +109,18 @@ class postscript(printer):
     return vol in self.volumes() # return availability
 
   # check if remote directory exists
-  def dir_exists(self, path, list=[]):
+  def dir_exists(self, path: bytes, list=[]):
     path = self.escape(path)
     if self.fuzz and not list: # use status instead of filenameforall
       return (self.file_exists(path) != c.NONEXISTENT)
     # use filenameforall as some ps interpreters do not support status
     if not list: list = self.dirlist(path, False)
     for name in list: # use dirlist to check if directory
-      if re.search("^(%.*%)?" + path + c.SEP, name): return True
+      if re.search(b"^(%.*%)?" + path + c.SEP, name): return True
 
   # check if remote file exists
-  def file_exists(self, path, ls=False):
-    bytes_recv = self.cmd('(' + path + ') status dup '
+  def file_exists(self, path: bytes, ls=False):
+    bytes_recv = self.cmd('(' + path.decode() + ') status dup '
              + '{pop == == == ==} if', False)
     meta = bytes_recv.splitlines()
     # standard conform ps interpreters respond with file size + timestamps
@@ -137,12 +137,12 @@ class postscript(printer):
     else: return c.NONEXISTENT
 
   # escape postscript pathname
-  def escape(self, path):
-    return path.replace('\\', '\\\\').replace('(', r'\(').replace(')', r'\)')
+  def escape(self, path: bytes) -> bytes:
+    return path.replace(b'\\', b'\\\\').replace(b'(', rb'\(').replace(b')', rb'\)')
 
   #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   # get complete list of files and directories on remote device
-  def dirlist(self, path=b"", r=True) -> List[bytes]:
+  def dirlist(self, path: bytes=b"", r=True) -> List[bytes]:
     if r: path = self.rpath(path)
     path = self.escape(path + self.get_sep(path))
     vol = b"" if self.vol else b"%*%" # search any volume if none specified
@@ -151,17 +151,17 @@ class postscript(printer):
     list = {name for name in str_recv.splitlines()}
     return sorted(list)
 
-  def find(self, path):
+  def find(self, path: bytes) -> bytes:
     str_send = '{false statusdict /setfilenameextend get exec} stopped\n'\
-               '/str 256 string def (' + path + ') '\
+               '/str 256 string def (' + path.decode() + ') '\
                '{print (\\n) print} str filenameforall'
     return self.timeoutcmd(str_send, self.timeout * 2, False)
 
   # ------------------------[ ls <path> ]-------------------------------
   def do_ls(self, arg: str):
     "List contents of remote directory:  ls <path>"
-    path = self.rpath(arg) + self.get_sep(arg)
-    list = self.dirlist(arg)
+    path = self.rpath(arg.encode()) + self.get_sep(arg.encode())
+    list = self.dirlist(arg.encode())
     cwdlist = []
     # create file list without subdirs
     for name in list:
@@ -178,19 +178,19 @@ class postscript(printer):
         (size, otime, mtime) = ('-', conv().lsdate(0), conv().lsdate(0))
       elif metadata != c.NONEXISTENT: size, otime, mtime = metadata
       if metadata != c.NONEXISTENT: # we got real or dummy metadata
-        output().psdir(isdir, size, otime, self.basename(name), mtime)
+        output().psdir(isdir, size, otime, self.basename(name).decode(), mtime)
       else: output().errmsg("Crippled filename", 'Bad interpreter')
 
   # ------------------------[ find <path> ]-----------------------------
   def do_find(self, arg: str):
     "Recursively list contents of directory:  find <path>"
-    for name in self.dirlist(arg):
+    for name in self.dirlist(arg.encode()):
       output().psfind(name)
 
   # ------------------------[ mirror <path> ]---------------------------
   def do_mirror(self, arg: str):
     "Mirror remote file system to local directory:  mirror <remote path>"
-    for name in self.dirlist(arg):
+    for name in self.dirlist(arg.encode()):
       self.mirror(name, True)
 
   # ====================================================================
@@ -202,7 +202,7 @@ class postscript(printer):
       arg = eval(input("Directory: "))
     # writing to dir/file should automatically create dir/
     # .dirfile is not deleted as empty dirs are not listed
-    self.put(self.rpath(arg) + c.SEP + b'.dirfile', '')
+    self.put(self.rpath(arg.encode()) + c.SEP + b'.dirfile', '')
 
   # ------------------------[ get <file> ]------------------------------
   def get(self, path, size=None):
@@ -242,10 +242,10 @@ class postscript(printer):
 
   # ------------------------[ rename <old> <new> ]----------------------
   def do_rename(self, arg: str):
-    arg = re.split(r"\s+", arg, 1)
-    if len(arg) > 1:
-      old = self.rpath(arg[0].encode())
-      new = self.rpath(arg[1].encode())
+    args = re.split(r"\s+", arg, 1)
+    if len(args) > 1:
+      old = self.rpath(args[0].encode())
+      new = self.rpath(args[1].encode())
       self.cmd('(' + old.decode() + ') (' + new.decode() + ') renamefile', False)
     else:
       self.onecmd("help rename")
@@ -289,7 +289,7 @@ class postscript(printer):
     output().df(('VOLUME', 'TOTAL SIZE', 'FREE SPACE', 'PRIORITY',
     'REMOVABLE', 'MOUNTED', 'HASNAMES', 'WRITEABLE', 'SEARCHABLE'))
     for vol in self.volumes():
-      str_send = '(' + vol + ') devstatus dup {pop ' + '== ' * 8 + '} if'
+      str_send = '(' + vol.decode() + ') devstatus dup {pop ' + '== ' * 8 + '} if'
       lst_recv = self.cmd(str_send).splitlines()
       values = (vol,) + tuple(lst_recv if len(lst_recv) == 8 else ['-'] * 8)
       output().df(values)
@@ -408,12 +408,12 @@ class postscript(printer):
       arg = '0' # assume we have successfully reset the passwords to zero
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # finally unlock device with user-supplied or cracked password
-    str_recv = self.cmd('{ << /Password (' + arg + ')\n'
+    bytes_recv = self.cmd('{ << /Password (' + arg + ')\n'
                         '  /SystemParamsPassword ()\n' # mostly harmless
                         '  /StartJobPassword ()\n' # permanent VM change
                         '  >> setsystemparams\n} stopped ==')
     msg = "Use the 'reset' command to restore factory defaults"
-    if not 'false' in str_recv: output().errmsg("Cannot unlock", msg)
+    if not b'false' in bytes_recv: output().errmsg("Cannot unlock", msg)
     else: output().raw("Device unlocked with password: " + arg)
 
   # ------------------------[ restart ]---------------------------------
@@ -565,10 +565,10 @@ class postscript(printer):
   # ------------------------[ replace <old> <new> ]---------------------
   def do_replace(self, arg: str):
     "Replace string in documents to be printed:  replace <old> <new>"
-    arg = re.split("\s+", arg, 1)
-    if len(arg) > 1:
+    args = re.split(r"\s+", arg, 1)
+    if len(args) > 1:
       output().psonly()
-      oldstr, newstr = self.escape(arg[0]), self.escape(arg[1])
+      oldstr, newstr = self.escape(args[0].encode()).decode(), self.escape(args[1].encode()).decode()
       self.globalcmd('/strcat {exch dup length 2 index length add string dup\n'
                       'dup 4 2 roll copy length 4 -1 roll putinterval} def\n'
                       '/replace {exch pop (' + newstr + ') exch 3 1 roll exch strcat strcat} def\n'
@@ -880,7 +880,7 @@ class postscript(printer):
                '/remove {exch pop () exch 3 1 roll exch strcat strcat} def\n'       \
                '/escape { {(")   search {remove}{exit} ifelse} loop \n'             \
                '          {(/)   search {remove}{exit} ifelse} loop \n'             \
-               '          {(\\\) search {remove}{exit} ifelse} loop } def\n'        \
+               r'          {(\\\) search {remove}{exit} ifelse} loop } def\n'        \
                '/clones 220 array def /counter 0 def % performance drawback\n'      \
                '/redundancy { /redundant false def\n'                               \
                '  clones {exch dup 3 1 roll eq {/redundant true def} if} forall\n'  \
@@ -963,8 +963,8 @@ class postscript(printer):
 
   # ------------------------[ resource <category> [dump] ]--------------
   def do_resource(self, arg: str):
-    arg = re.split("\s+", arg, 1)
-    cat, dump = arg[0], len(arg) > 1
+    args = re.split(r"\s+", arg, 1)
+    cat, dump = args[0], len(args) > 1
     self.populate_resource()
     if cat in self.options_resource:
       str_send = '(*) {128 string cvs print (\\n) print}'\
@@ -972,7 +972,7 @@ class postscript(printer):
       items = self.cmd(str_send).splitlines()
       for item in sorted(items):
         output().info(item)
-        if dump: self.do_dump('/' + item + ' /' + cat + ' findresource', True)
+        if dump: self.do_dump(b'/' + item + b' /' + cat.encode() + b' findresource', True)
     else:
       self.onecmd("help resource")
 
@@ -982,7 +982,7 @@ class postscript(printer):
     print("Available resources on this device:")
     last = None
     if len(self.options_resource) > 0: last = sorted(self.options_resource)[-1]
-    for res in sorted(self.options_resource): print((('└─ ' if res == last else '├─ ') + res))
+    for res in sorted(self.options_resource): print((('└─ ' if res == last else '├─ ') + res.decode()))
 
   options_resource = []
   def complete_resource(self, text, line, begidx, endidx):
@@ -997,9 +997,9 @@ class postscript(printer):
   # ------------------------[ set <key=value> ]-------------------------
   def do_set(self, arg: str):
     "Set key to value in topmost dictionary:  set <key=value>"
-    arg = re.split("=", arg, 1)
-    if len(arg) > 1:
-      key, val = arg
+    args = re.split("=", arg, 1)
+    if len(args) > 1:
+      key, val = args
       # make changes permanent
       str_send = 'true 0 startjob {\n'
       # flavor No.1: put (associate key with value in dict)
@@ -1016,8 +1016,8 @@ class postscript(printer):
 
   # ------------------------[ config <setting> ]------------------------
   def do_config(self, arg: str):
-    arg = re.split("\s+", arg, 1)
-    (arg, val) = tuple(arg) if len(arg) > 1 else (arg[0], None)
+    args = re.split(r"\s+", arg, 1)
+    (arg, val) = tuple(args) if len(args) > 1 else (args[0], None)
     if arg in list(self.options_config.keys()):
       key = self.options_config[arg]
       if arg == 'copies' and not val: return self.help_config()
