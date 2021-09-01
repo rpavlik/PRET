@@ -333,8 +333,9 @@ class printer(cmd.Cmd):
   # ------------------------[ cd <path> ]-------------------------------
   def do_cd(self, arg: str):
     "Change remote working directory:  cd <path>"
-    if not self.cpath(arg) or self.dir_exists(self.rpath(arg)):
-      if re.match(rb"^[\." + c.SEP + rb"]+$", self.cpath(arg)):
+    path = arg.encode()
+    if not self.cpath(path) or self.dir_exists(self.rpath(path)):
+      if re.match(rb"^[\." + c.SEP + rb"]+$", self.cpath(path)):
         output().raw("*** Congratulations, path traversal found ***")
         output().chitchat("Consider setting 'traversal' instead of 'cd'.")
       self.set_cwd(arg)
@@ -685,8 +686,8 @@ class printer(cmd.Cmd):
     output().hline()
     # try blind file access strategies (absolute path)
     for vol in self.volumes() + fuzzer().blind:
-      sep  = '' if vol[-1:] in ['', '/', '\\' ] else '/'
-      sep2 = vol[-1:] if vol[-1:] in ['/', '\\'] else '/'
+      sep  = b'' if vol[-1:] in [b'', b'/', b'\\' ] else b'/'
+      sep2 = vol[-1:] if vol[-1:] in [b'/', b'\\'] else b'/'
       # filenames to look for
       for file in fuzzer().abs:
         # set current delimiter
@@ -718,12 +719,12 @@ class printer(cmd.Cmd):
       if dir2 not in list(found.values()):
         found[path] = dir2
         output().raw("Listing directory.")
-        self.do_ls(path)
+        self.do_ls(path.decode())
     elif opt1: # only EXISTS successful
       found[path] = None
 
   def dirlist(self, path: bytes, sep: bool, **kwargs): raise NotImplementedError
-  def do_ls(self, arg: bytes): raise NotImplementedError
+  def do_ls(self, arg: str): raise NotImplementedError
 
   # check for remote files (write)
   def verify_write(self, path, name, data, cmd):

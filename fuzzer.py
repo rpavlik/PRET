@@ -2,27 +2,27 @@
 # -*- coding: utf-8 -*-
 
 class fuzzer():
-  vol = ["", ".", "\\", "/", "file:///", "C:/"]
-  var = ["~", "$HOME"]
-  win = ["%WINDIR%", "%SYSTEMROOT%", "%HOMEPATH%", "%PROGRAMFILES%"]
-  smb = ["\\\\127.0.0.1\\"]
-  web = ["http://127.0.0.1/"] # "http://hacking-printers.net/log.me"
-  dir = ["..", "...", "...."] # also combinations like "./.."
-# sep = ["", "\\", "/", "\\\\", "//", "\\/"] 
-  fhs = ["/etc", "/bin", "/sbin", "/home", "/proc", "/dev", "/lib",
-         "/opt", "/run",  "/sys", "/tmp", "/usr", "/var",  "/mnt",]
-  abs = [".profile", ["etc", "passwd"], ["bin", "sh"], ["bin", "ls"],
-         "boot.ini", ["windows", "win.ini"], ["windows", "cmd.exe"]]
-  rel = ["%WINDIR%\\win.ini",
-         "%WINDIR%\\repair\\sam",
-         "%WINDIR%\\repair\\system",
-         "%WINDIR%\\system32\\config\\system.sav",
-         "%WINDIR%\\System32\\drivers\\etc\\hosts",
-         "%SYSTEMDRIVE%\\boot.ini",
-         "%USERPROFILE%\\ntuser.dat",
-         "%SYSTEMDRIVE%\\pagefile.sys",
-         "%SYSTEMROOT%\\repair\\sam",
-         "%SYSTEMROOT%\\repair\\system"]
+  vol = [b"", b".", b"\\", b"/", b"file:///", b"C:/"]
+  var = [b"~", b"$HOME"]
+  win = [b"%WINDIR%", b"%SYSTEMROOT%", b"%HOMEPATH%", b"%PROGRAMFILES%"]
+  smb = [b"\\\\127.0.0.1\\"]
+  web = [b"http://127.0.0.1/"] # "http://hacking-printers.net/log.me"
+  dir = [b"..", b"...", b"...."] # also combinations like "./.."
+# sep = [b"", b"\\", b"/", b"\\\\", b"//", b"\\/"]
+  fhs = [b"/etc", b"/bin", b"/sbin", b"/home", b"/proc", b"/dev", b"/lib",
+         "/opt", b"/run",  "/sys", b"/tmp", b"/usr", b"/var", b"/mnt",]
+  abs = [b".profile", [b"etc", b"passwd"], [b"bin", b"sh"], [b"bin", b"ls"],
+         "boot.ini", [b"windows", b"win.ini"], [b"windows", b"cmd.exe"]]
+  rel = [b"%WINDIR%\\win.ini",
+         b"%WINDIR%\\repair\\sam",
+         b"%WINDIR%\\repair\\system",
+         b"%WINDIR%\\system32\\config\\system.sav",
+         b"%WINDIR%\\System32\\drivers\\etc\\hosts",
+         b"%SYSTEMDRIVE%\\boot.ini",
+         b"%USERPROFILE%\\ntuser.dat",
+         b"%SYSTEMDRIVE%\\pagefile.sys",
+         b"%SYSTEMROOT%\\repair\\sam",
+         b"%SYSTEMROOT%\\repair\\system"]
 
   # define prefixes to use in fuzzing modes
   path  = vol+var+win+smb+web # path fuzzing
