@@ -550,6 +550,7 @@ class postscript(printer):
   def help_cross(self):
     print("Put printer graffiti on all hard copies:  cross <font> <text>")
     print("Read the docs on how to install custom fonts. Available fonts:")
+    last = None
     if len(self.options_cross) > 0: last = sorted(self.options_cross)[-1]
     for font in sorted(self.options_cross): print((('└─ ' if font == last else '├─ ') + font))
 
@@ -979,6 +980,7 @@ class postscript(printer):
     self.populate_resource()
     print("List or dump PostScript resource:  resource <category> [dump]")
     print("Available resources on this device:")
+    last = None
     if len(self.options_resource) > 0: last = sorted(self.options_resource)[-1]
     for res in sorted(self.options_resource): print((('└─ ' if res == last else '├─ ') + res))
 
