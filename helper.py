@@ -148,8 +148,9 @@ class output():
 
   # recursively list files
   def psfind(self, name):
-    vol = Style.DIM + Fore.YELLOW + item(re.findall(r"^(%.*%)", name)) + Style.RESET_ALL
-    name = Fore.YELLOW + const.SEP_STR + re.sub(r"^(%.*%)", '', name) + Style.RESET_ALL
+    decoded_name = name.decode()
+    vol = Style.DIM + Fore.YELLOW + item(re.findall(r"^(%.*%)", decoded_name)) + Style.RESET_ALL
+    name = Fore.YELLOW + const.SEP_STR + re.sub(r"^(%.*%)", '', decoded_name) + Style.RESET_ALL
     print("%s %s" % (vol, name))
 
   # show directory listing
@@ -309,8 +310,11 @@ class conv():
       num /= 1024.0
 
   # remove carriage return from line breaks
-  def nstrip(self, data):
+  def nstrip(self, data: str):
     return re.sub(r'\r\n', '\n', data)
+
+  def nstrip_bytes(self, data: bytes):
+    return re.sub(rb'\r\n', b'\n', data)
 
   # convert string to hexdecimal
   def hex(self, data, sep=''):

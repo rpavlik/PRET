@@ -423,14 +423,14 @@ class printer(cmd.Cmd):
       arg = eval(input("Remote file: "))
     if not lpath:
       lpath = self.basename(arg)
-    path = self.rpath(arg) if r else arg
+    path = self.rpath(arg.encode()) if r else arg.encode()
     str_recv = self.get(path)
     if str_recv != c.NONEXISTENT:
       rsize, data = str_recv
       lsize = len(data)
       # fix carriage return chars added by some devices
-      if lsize != rsize and len(conv().nstrip(data)) == rsize:
-        lsize, data = rsize, conv().nstrip(data)
+      if lsize != rsize and len(conv().nstrip_bytes(data)) == rsize:
+        lsize, data = rsize, conv().nstrip_bytes(data)
       # write to local file
       file().write(lpath, data)
       if lsize == rsize:

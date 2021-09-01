@@ -211,7 +211,7 @@ class postscript(printer):
     if size != c.NONEXISTENT:
       # read file, one byte at a time
       str_recv = self.cmd('/byte (0) def\n'
-                        + '/infile (' + path + ') (r) file def\n'
+                        + '/infile (' + path.decode() + ') (r) file def\n'
                         + '{infile read {byte exch 0 exch put\n'
                         + '(%stdout) (w) file byte writestring}\n'
                         + '{infile closefile exit} ifelse\n'
