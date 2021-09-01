@@ -298,6 +298,11 @@ class printer(cmd.Cmd, object):
     if vol and self.mode == 'pjl': vol = vol[0]
     return vol
 
+  
+  def vol_exists(self, vol: bytes) -> bool: raise NotImplementedError
+
+  def volumes(self) -> List[str]: raise NotImplementedError
+
   # ------------------------[ traversal <path> ]------------------------
   def do_traversal(self, arg):
     "Set path traversal:  traversal <path>"
@@ -603,7 +608,7 @@ class printer(cmd.Cmd, object):
     output().hline()
     found = {} # pathes found
     # try base pathes first
-    for path in self.vol_exists() + fuzzer().path:
+    for path in self.volumes() + fuzzer().path:
       self.verify_path(path, found)
     output().raw("Checking filesystem hierarchy standard.")
     # try direct access to fhs dirs
@@ -635,7 +640,7 @@ class printer(cmd.Cmd, object):
     # test data to put/append
     data = "test"; data2 = "test2"
     # try write to disk strategies
-    for vol in self.vol_exists() + fuzzer().write:
+    for vol in self.volumes() + fuzzer().write:
       sep = '' if vol[-1:] in ['', '/', '\\' ] else '/'
       name = "dat" + str(random.randrange(10000))
       # FSDOWNLOAD
@@ -659,7 +664,7 @@ class printer(cmd.Cmd, object):
       self.verify_blind(path, "")
     output().hline()
     # try blind file access strategies (absolute path)
-    for vol in self.vol_exists() + fuzzer().blind:
+    for vol in self.volumes() + fuzzer().blind:
       sep  = '' if vol[-1:] in ['', '/', '\\' ] else '/'
       sep2 = vol[-1:] if vol[-1:] in ['/', '\\'] else '/'
       # filenames to look for

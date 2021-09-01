@@ -98,13 +98,15 @@ class postscript(printer):
 
   # --------------------------------------------------------------------
   # check if remote volume exists
-  def vol_exists(self, vol=''):
-    if vol: vol = '%' + vol.strip('%') + '%'
+  def volumes(self):
     bytes_recv = self.cmd('/str 128 string def (*)'
              + '{print (\\n) print} str devforall')
     vols = bytes_recv.splitlines() + [b'%*%']
-    if vol: return vol in vols # return availability
-    else: return vols # return list of existing vols
+    return vols # return list of existing vols
+
+  def vol_exists(self, vol):
+    vol = '%' + vol.strip('%') + '%'
+    return vol in self.volumes() # return availability
 
   # check if remote directory exists
   def dir_exists(self, path, list=[]):
@@ -286,7 +288,7 @@ class postscript(printer):
     "Show volume information."
     output().df(('VOLUME', 'TOTAL SIZE', 'FREE SPACE', 'PRIORITY',
     'REMOVABLE', 'MOUNTED', 'HASNAMES', 'WRITEABLE', 'SEARCHABLE'))
-    for vol in self.vol_exists():
+    for vol in self.volumes():
       str_send = '(' + vol + ') devstatus dup {pop ' + '== ' * 8 + '} if'
       lst_recv = self.cmd(str_send).splitlines()
       values = (vol,) + tuple(lst_recv if len(lst_recv) == 8 else ['-'] * 8)

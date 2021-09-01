@@ -95,12 +95,16 @@ class pjl(printer):
 
   # --------------------------------------------------------------------
   # check if remote volume exists
-  def vol_exists(self, vol=''):
+  def vol_exists(self, vol):
     str_recv = self.cmd('@PJL INFO FILESYS')
     vols = [line.lstrip()[0] for line in str_recv.splitlines()[1:] if line]
-    if vol: return vol[0] in vols # return availability
-    else: # return list of existing volumes for fuzzing
-      return [vol + ':' + c.SEP for vol in vols]
+    return vol[0] in vols # return availability
+
+  def volumes(self):
+    str_recv = self.cmd('@PJL INFO FILESYS')
+    vols = [line.lstrip()[0] for line in str_recv.splitlines()[1:] if line]
+    return [b':' + c.SEP for vol in vols]
+
 
   # check if remote directory exists
   def dir_exists(self, path):
