@@ -183,7 +183,7 @@ class printer(cmd.Cmd, object):
       self.on_connect(mode)
       # show some information about the device
       if not self.quiet and mode != 'reconnect':
-        sys.stdout.write("Device:   ");
+        sys.stdout.write("Device:   ")
         self.do_id()
       print("")
       # set printer default values
