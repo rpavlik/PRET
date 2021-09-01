@@ -3,14 +3,15 @@
 
 # python standard library
 import re, os, sys, cmd, glob, errno, random, ntpath
-import posixpath, hashlib, tempfile, subprocess
+import posixpath, hashlib, tempfile, subprocess, abc
+from typing import List
 
 # local pret classes
 from helper import log, output, conv, file, item, conn, const as c
 from discovery import discovery
 from fuzzer import fuzzer
 
-class printer(cmd.Cmd, object):
+class printer(cmd.Cmd):
   # cmd module config and customization
   intro = "Welcome to the pret shell. Type help or ? to list commands."
   doc_header = "Available commands (type help <topic>):"
@@ -175,13 +176,17 @@ class printer(cmd.Cmd, object):
     if not arg:
       arg = eval(input("Target: "))
     # open connection
+    newtarget = (arg != self.target)
+    if isinstance(arg, str):
+      arg_bytes = arg.encode()
+    else:
+      arg_bytes = arg
     try:
-      newtarget = (arg != self.target)
-      self.target = arg # set new target
+      self.target = arg_bytes # set new target
       self.conn = conn(self.mode, self.debug, self.quiet)
       self.conn.timeout(self.timeout)
-      self.conn.open(arg)
-      print(("Connection to " + arg.decode() + " established"))
+      self.conn.open(arg_bytes)
+      print(("Connection to " + arg_bytes.decode() + " established"))
       # hook method executed after successful connection
       self.on_connect(mode)
       # show some information about the device
@@ -236,6 +241,10 @@ class printer(cmd.Cmd, object):
     str_recv = self.cmd(str_send, *stuff)
     self.do_timeout(timeout_old, True)
     return str_recv
+
+  @abc.abstractmethod
+  def cmd(self, str_send, **kwargs):
+    raise NotImplementedError
 
   # ------------------------[ reconnect ]-------------------------------
   def do_reconnect(self, *arg):
@@ -292,16 +301,20 @@ class printer(cmd.Cmd, object):
       self.vol = vol
 
   # get volume
-  def get_vol(self):
+  def get_vol(self) -> bytes:
     vol = self.vol
     if vol and self.mode == 'ps' : vol = vol.strip(b'%')
     if vol and self.mode == 'pjl': vol = vol[0]
     return vol
 
-  
+
   def vol_exists(self, vol: bytes) -> bool: raise NotImplementedError
 
   def volumes(self) -> List[str]: raise NotImplementedError
+
+  def dir_exists(self, vol: bytes) -> bool: raise NotImplementedError
+
+  def file_exists(self, path: bytes) -> bool: raise NotImplementedError
 
   # ------------------------[ traversal <path> ]------------------------
   def do_traversal(self, arg):
@@ -370,7 +383,7 @@ class printer(cmd.Cmd, object):
     return self.normpath(path)
 
   # get path with volume information
-  def rpath(self, path=b"") -> bytes:
+  def rpath(self, path: bytes=b"") -> bytes:
     # warn if path contains volume information
     if (path.startswith(b"%") or path.startswith(b'0:')) and not self.fuzz:
       output().warning("Do not refer to disks directly, use chvol.")
@@ -429,6 +442,9 @@ class printer(cmd.Cmd, object):
     size1, size2 = str(size1), str(size2)
     print(("Size mismatch (should: " + size1 + ", is: " + size2 + ")."))
 
+  def get(self, path, size=None): raise NotImplementedError
+  def put(self, path, data, **kwargs): raise NotImplementedError
+
   # ------------------------[ put <local file> ]------------------------
   def do_put(self, arg, rpath=""):
     "Send file:  put <local file>"
@@ -454,7 +470,7 @@ class printer(cmd.Cmd, object):
   # ------------------------[ append <file> <string> ]------------------
   def do_append(self, arg):
     "Append to file:  append <file> <string>"
-    arg = re.split(b"\s+", arg, 1)
+    arg = re.split(rb"\s+", arg, 1)
     if len(arg) > 1:
       path, data = arg
       rpath = self.rpath(path)
@@ -462,6 +478,8 @@ class printer(cmd.Cmd, object):
       self.append(rpath, data)
     else:
       self.onecmd("help append")
+
+  def append(self, path, data): raise NotImplementedError
 
   # ------------------------[ touch <file> ]----------------------------
   def do_touch(self, arg):
@@ -482,6 +500,8 @@ class printer(cmd.Cmd, object):
   do_rmdir = do_delete
   def help_delete(self):
     print("Delete remote file:  delete <file>")
+
+  def delete(self, arg): raise NotImplementedError
 
   # ------------------------[ cat <file> ]------------------------------
   def do_cat(self, arg):
@@ -521,7 +541,7 @@ class printer(cmd.Cmd, object):
     print("Edit remote files with our favorite editor:  edit <file>")
 
   # ------------------------[ mirror <path> ]---------------------------
-  def mirror(self, name, size):
+  def mirror(self, name: bytes, size):
     target, vol = self.basename(self.target), self.get_vol()
     root = os.path.abspath(os.path.join(b'mirror', target, vol))
     lpath = os.path.join(root, name)
@@ -547,11 +567,11 @@ class printer(cmd.Cmd, object):
       output().errmsg("Not saving data out of allowed path",
               "I'm sorry Dave, I'm afraid I can't do that.")
     elif size: # download current file
-      output().raw(self.vol + name + " -> " + lpath)
+      output().raw(self.vol + name + b" -> " + lpath)
       self.makedirs(os.path.dirname(lpath))
       self.do_get(self.vol + name, lpath, False)
     else:      # create current directory
-      self.chitchat("Traversing " + name)
+      self.chitchat("Traversing " + name.decode())
       self.makedirs(lpath)
 
   # recursive directory creation
@@ -701,6 +721,9 @@ class printer(cmd.Cmd, object):
         self.do_ls(path)
     elif opt1: # only EXISTS successful
       found[path] = None
+
+  def dirlist(self, path: bytes, sep: bool, **kwargs): raise NotImplementedError
+  def do_ls(self, arg: bytes): raise NotImplementedError
 
   # check for remote files (write)
   def verify_write(self, path, name, data, cmd):

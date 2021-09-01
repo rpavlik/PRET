@@ -12,12 +12,12 @@ from helper import log, output, conv, file, item, chunks, const as c
 class pjl(printer):
   # --------------------------------------------------------------------
   # send PJL command to printer, optionally receive response
-  def cmd(self, str_send, wait=True, crop=True, binary=False):
-    str_recv = "" # response buffer
-    str_stat = "" # status buffer
-    token = c.DELIMITER + str(random.randrange(2**16)) # unique delimiter
-    status = '@PJL INFO STATUS' + c.EOL if self.status and wait else ''
-    footer = '@PJL ECHO ' + token + c.EOL + c.EOL if wait else ''
+  def cmd(self, str_send, wait=True, crop=True, binary=False) -> bytes:
+    str_recv = b"" # response buffer
+    str_stat = b"" # status buffer
+    token = c.DELIMITER + bytes(random.randrange(2**16)) # unique delimiter
+    status = b'@PJL INFO STATUS' + c.EOL if self.status and wait else ''
+    footer = b'@PJL ECHO ' + token + c.EOL + c.EOL if wait else ''
     # send command to printer device
     try:
       cmd_send = c.UEL + str_send + c.EOL + status + footer + c.UEL
@@ -28,21 +28,21 @@ class pjl(printer):
       # for commands that expect a response
       if wait:
         # use random token as delimiter PJL responses
-        str_recv = self.recv('(@PJL ECHO\s+)?' + token + '.*$', wait, True, binary)
+        str_recv = self.recv(b'(@PJL ECHO\s+)?' + token + '.*$', wait, True, binary)
         if self.status:
           # get status messages and remove them from received buffer
-          str_stat = item(re.findall("@PJL INFO STATUS.*", str_recv, re.DOTALL))
-          str_recv = re.compile('\x0c?@PJL INFO STATUS.*', re.DOTALL).sub('', str_recv)
+          str_stat = item(re.findall(b"@PJL INFO STATUS.*", str_recv, re.DOTALL))
+          str_recv = re.compile(rb'\x0c?@PJL INFO STATUS.*', re.DOTALL).sub(b'', str_recv)
         if crop:
           # crop very first PJL line which is echoed by most interpreters
-          str_recv = re.sub(r'^\x04?(\x00+)?@PJL.*' + c.EOL, '', str_recv)
+          str_recv = re.sub(rb'^\x04?(\x00+)?@PJL.*' + c.EOL, b'', str_recv)
       return self.pjl_err(str_recv, str_stat)
 
     # handle CTRL+C and exceptions
     except (KeyboardInterrupt, Exception) as e:
       if self.exceptions: raise
       if not self.fuzz or not str(e): self.reconnect(str(e))
-      return ""
+      return b""
 
   # handle error messages from PJL interpreter
   def pjl_err(self, str_recv, str_stat):
@@ -109,13 +109,13 @@ class pjl(printer):
   # check if remote directory exists
   def dir_exists(self, path):
     str_recv = self.cmd('@PJL FSQUERY NAME="' + path + '"', True, False)
-    if re.search("TYPE=DIR", str_recv):
+    if re.search(rb"TYPE=DIR", str_recv):
       return True
 
   # check if remote file exists
   def file_exists(self, path):
     str_recv = self.cmd('@PJL FSQUERY NAME="' + path + '"', True, False)
-    size = re.findall("TYPE\s*=\s*FILE\s+SIZE\s*=\s*(\d*)", str_recv)
+    size = re.findall(rb"TYPE\s*=\s*FILE\s+SIZE\s*=\s*(\d*)", str_recv)
     # return file size
     return conv().int(item(size, c.NONEXISTENT))
 
@@ -125,12 +125,12 @@ class pjl(printer):
   def complete_rfiles(self, text, line, begidx, endidx, path=''):
     # get path from line
     if c.SEP in line:
-      path = posixpath.dirname(re.split("\s+", line, 1)[-1:][0])
+      path = posixpath.dirname(re.split(r"\s+", line, 1)[-1:][0])
     # get dirlist, set new remote path
-    newpath = self.cwd + c.SEP + path
+    newpath = self.cwd + c.SEP + path.encode()
     if not self.options_rfiles or newpath != self.oldpath_rfiles:
       self.options_rfiles = self.dirlist(path)
-      self.oldpath_rfiles = self.cwd + c.SEP + path
+      self.oldpath_rfiles = self.cwd + c.SEP + path.encode()
     # options_rfiles contains basenames
     text = self.basename(text)
     return [cat for cat in self.options_rfiles if cat.startswith(text)]
@@ -153,9 +153,9 @@ class pjl(printer):
   def complete_rdirs(self, text, line, begidx, endidx, path=''):
     # get path from line
     if c.SEP in line:
-      path = posixpath.dirname(re.split("\s+", line, 1)[-1:][0])
+      path = posixpath.dirname(re.split(r"\s+", line, 1)[-1:][0])
     # get dirlist, set new remote path
-    newpath = self.cwd + c.SEP + path
+    newpath = self.cwd + c.SEP + path.encode()
     if not self.options_rdirs or newpath != self.oldpath_rdirs:
       self.options_rdirs = self.dirlist(path, True, False, True)
       self.oldpath_rdirs = newpath
@@ -176,17 +176,17 @@ class pjl(printer):
     # get remote path if not in recursive mode
     if r: path = self.rpath(path)
     # receive list of files on remote device
-    str_recv = self.cmd('@PJL FSDIRLIST NAME="' + path + '" ENTRY=1 COUNT=65535')
+    str_recv = self.cmd(b'@PJL FSDIRLIST NAME="' + path + b'" ENTRY=1 COUNT=65535')
     list = {}
     for item in str_recv.splitlines():
       # get directories
-      dirname = re.findall("^(.*)\s+TYPE\s*=\s*DIR$", item)
+      dirname = re.findall(rb"^(.*)\s+TYPE\s*=\s*DIR$", item)
       if dirname and (dirname[0] not in ("", ".", "..") or hidden):
         sep = c.SEP if sep and dirname[0][-1:] != c.SEP else ''
         list[dirname[0] + sep] = None
       # get files
-      filename = re.findall("^(.*)\s+TYPE\s*=\s*FILE", item)
-      filesize = re.findall("FILE\s+SIZE\s*=\s*(\d*)", item)
+      filename = re.findall(rb"^(.*)\s+TYPE\s*=\s*FILE", item)
+      filesize = re.findall(rb"FILE\s+SIZE\s*=\s*(\d*)", item)
       if filename and filesize and not dirsonly:
         list[filename[0]] = filesize[0]
     return list
@@ -210,7 +210,7 @@ class pjl(printer):
     if not arg:
       arg = eval(input("Directory: "))
     path = self.rpath(arg)
-    self.cmd('@PJL FSMKDIR NAME="' + path + '"', False)
+    self.cmd(b'@PJL FSMKDIR NAME="' + path + b'"', False)
 
   # ------------------------[ get <file> ]------------------------------
   def get(self, path, size=None):
