@@ -4,7 +4,7 @@
 # python standard library
 import re, os, sys, cmd, glob, errno, random, ntpath
 import posixpath, hashlib, tempfile, subprocess, abc
-from typing import List
+from typing import Dict, List, Optional
 
 # local pret classes
 from helper import log, output, conv, file, item, conn, const as c
@@ -310,7 +310,7 @@ class printer(cmd.Cmd):
 
   def vol_exists(self, vol: bytes) -> bool: raise NotImplementedError
 
-  def volumes(self) -> List[str]: raise NotImplementedError
+  def volumes(self) -> List[bytes]: raise NotImplementedError
 
   def dir_exists(self, vol: bytes) -> bool: raise NotImplementedError
 
@@ -626,7 +626,7 @@ class printer(cmd.Cmd):
     # get a cup of coffee, fuzzing will take some time
     output().fuzzed('PATH', '', ('', 'EXISTS',  'DIRLIST'))
     output().hline()
-    found = {} # pathes found
+    found: Dict[bytes, Optional[bytes]] = {} # pathes found
     # try base pathes first
     for path in self.volumes() + fuzzer().path:
       self.verify_path(path, found)
@@ -641,8 +641,8 @@ class printer(cmd.Cmd):
       output().hline()
       # only check found volumes
       for vol in found:
-        sep  = '' if vol[-1:] in ['', '/', '\\' ] else '/'
-        sep2 = vol[-1:] if vol[-1:] in ['/', '\\'] else '/'
+        sep  = b'' if vol[-1:] in [b'', b'/', b'\\' ] else b'/'
+        sep2 = vol[-1:] if vol[-1:] in [b'/', b'\\'] else b'/'
         # 1st level traversal
         for dir in fuzzer().dir:
           path = vol + sep + dir + sep2
@@ -705,7 +705,7 @@ class printer(cmd.Cmd):
             self.verify_blind(path, file)
 
   # check for path traversal
-  def verify_path(self, path, found={}):
+  def verify_path(self, path: bytes, found: Dict[bytes, Optional[bytes]]={}):
     # 1st method: EXISTS
     opt1 = (self.dir_exists(path) or False)
     # 2nd method: DIRLIST

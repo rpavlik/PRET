@@ -96,14 +96,18 @@ class pjl(printer):
   # --------------------------------------------------------------------
   # check if remote volume exists
   def vol_exists(self, vol):
-    str_recv = self.cmd('@PJL INFO FILESYS')
-    vols = [line.lstrip()[0] for line in str_recv.splitlines()[1:] if line]
-    return vol[0] in vols # return availability
+    vols = self._vols()
+    return vol[0] in vols
 
   def volumes(self):
-    str_recv = self.cmd('@PJL INFO FILESYS')
-    vols = [line.lstrip()[0] for line in str_recv.splitlines()[1:] if line]
+    vols = self._vols()
     return [b':' + c.SEP for vol in vols]
+
+  def _vols(self):
+      str_recv = self.cmd('@PJL INFO FILESYS')
+      vols = [line.lstrip()[0] for line in str_recv.splitlines()[1:] if line]
+      return vols# return availability
+
 
 
   # check if remote directory exists
@@ -450,7 +454,7 @@ class pjl(printer):
   def do_selftest(self, arg: str):
     "Perform various printer self-tests."
     # pjl-based testpage commands
-    pjltests = ['SELFTEST',                 # pcl self-test 
+    pjltests = ['SELFTEST',                 # pcl self-test
                 'PCLTYPELIST',              # pcl typeface list
                 'CONTSELFTEST',             # continuous self-test
                 'PCLDEMOPAGE',              # pcl demo page
@@ -463,7 +467,7 @@ class pjl(printer):
                 'SUPPLIESSTATUSREPORT']     # supplies status
     for test in pjltests: self.cmd('@PJL SET TESTPAGE=' + test, False)
     # pml-based testpage commands
-    pmltests = ['"04000401010502040103"',   # pcl self-test 
+    pmltests = ['"04000401010502040103"',   # pcl self-test
                 '"04000401010502040107"',   # drinter event log
                 '"04000401010502040108"',   # directory listing
                 '"04000401010502040109"',   # menu map

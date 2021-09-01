@@ -98,14 +98,14 @@ class postscript(printer):
 
   # --------------------------------------------------------------------
   # check if remote volume exists
-  def volumes(self):
+  def volumes(self) -> List[bytes]:
     bytes_recv = self.cmd('/str 128 string def (*)'
              + '{print (\\n) print} str devforall')
     vols = bytes_recv.splitlines() + [b'%*%']
     return vols # return list of existing vols
 
-  def vol_exists(self, vol):
-    vol = '%' + vol.strip('%') + '%'
+  def vol_exists(self, vol: bytes):
+    vol = b'%' + vol.strip(b'%') + b'%'
     return vol in self.volumes() # return availability
 
   # check if remote directory exists
