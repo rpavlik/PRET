@@ -124,7 +124,7 @@ class output():
   def errmsg(self, msg, info=""):
     info = str(info).strip()
     if info: # monkeypatch to make python error message less ugly
-      info = item(re.findall('Errno -?\d+\] (.*)', info), '') or info.splitlines()[-1]
+      info = item(re.findall(r'Errno -?\d+\] (.*)', info), '') or info.splitlines()[-1]
       info = Style.RESET_ALL + Style.DIM + " (" + info.strip('<>') + ")" + Style.RESET_ALL
     if msg: print(Back.RED + msg + info)
 
@@ -146,8 +146,8 @@ class output():
 
   # recursively list files
   def psfind(self, name):
-    vol = Style.DIM + Fore.YELLOW + item(re.findall("^(%.*%)", name)) + Style.RESET_ALL
-    name = Fore.YELLOW + const.SEP + re.sub("^(%.*%)", '', name) + Style.RESET_ALL
+    vol = Style.DIM + Fore.YELLOW + item(re.findall(r"^(%.*%)", name)) + Style.RESET_ALL
+    name = Fore.YELLOW + const.SEP_STR + re.sub(r"^(%.*%)", '', name) + Style.RESET_ALL
     print("%s %s" % (vol, name))
 
   # show directory listing
@@ -387,14 +387,14 @@ class conn(object):
     # send data to device
     if self._file: return os.write(self._file, data)
     # send data to socket
-    elif self._sock: return self._sock.sendall(data.encode())
+    elif self._sock: return self._sock.sendall(data)
 
   # receive data
   def recv(self, bytes):
     # receive data from device
-    if self._file: data = os.read(self._file, bytes).decode()
+    if self._file: data = os.read(self._file, bytes)
     # receive data from socket
-    else: data = self._sock.recv(bytes).decode()
+    else: data = self._sock.recv(bytes)
     # output recv data when in debug mode
     if self.debug: output().recv(self.beautify(data), self.debug)
     return data
@@ -408,22 +408,22 @@ class conn(object):
     return not (self.quiet or self.debug) and watchdog > limit
 
   # receive data until a delimiter is reached
-  def recv_until(self, delimiter, fb=True, crop=True, binary=False):
-    data = ""
+  def recv_until(self, delimiter: bytes, fb=True, crop=True, binary=False):
+    data = b""
     sleep = 0.01 # pause in recv loop
     limit = 3.0 # max watchdog overrun
     wd = 0.0 # watchdog timeout counter
     r = re.compile(delimiter, re.DOTALL)
-    s = re.compile("^\x04?\x0d?\x0a?" + delimiter, re.DOTALL)
+    s = re.compile(rb"^\x04?\x0d?\x0a?" + delimiter, re.DOTALL)
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     while not r.search(data):
       data += self.recv(4096) # receive actual data
-      if self.past(limit, wd): wd_old, bytes = wd, len(data)
+      if self.past(limit, wd): wd_old, nbytes = wd, len(data)
       wd += sleep       # workaround for endless loop w/o socket timeout
       time.sleep(sleep) # happens on some devices - python socket error?
       # timeout plus it seems we are not receiving data anymore
       if wd > self._sock.gettimeout() and wd >= wd_old + limit:
-        if len(data) == bytes:
+        if len(data) == nbytes:
           output().errmsg("Receiving data failed", "watchdog timeout")
           break
       # visual feedback on large/slow data transfers
@@ -436,9 +436,9 @@ class conn(object):
     # this also happens for data received out of order (e.g. brother)
     if fb and s.search(data): output().chitchat("No data received.")
     # remove delimiter itself from data
-    if crop: data = r.sub('', data)
+    if crop: data = r.sub(b'', data)
     # crop uel sequence at the beginning
-    data = re.sub(r'(^' + const.UEL + ')', '', data)
+    data = re.sub(rb'(^' + const.UEL + rb')', b'', data)
     '''
     ┌─────────────────────────────────────────────────────────────────────────┐
     │ delimiters -- note that carriage return (0d) is optional in ps/pjl      │
@@ -454,45 +454,45 @@ class conn(object):
     '''
     # crop end-of-transmission chars
     if self.mode == 'ps':
-      data = re.sub(r'^\x04', '', data)
-      if not binary: data = re.sub(r'\x0d?\x0a\x04?$', '', data)
+      data = re.sub(rb'^\x04', b'', data)
+      if not binary: data = re.sub(rb'\x0d?\x0a\x04?$', b'', data)
     else: # pjl and pcl mode
-      if binary: data = re.sub(r'\x0c$', '', data)
-      else: data = re.sub(r'\x0d+\x0a\x0c\x04?$', '', data)
+      if binary: data = re.sub(rb'\x0c$', b'', data)
+      else: data = re.sub(rb'\x0d+\x0a\x0c\x04?$', b'', data)
     # crop whitespaces/newline as feedback
     if not binary: data = data.strip()
     return data
 
   # beautify debug output
-  def beautify(self, data):
+  def beautify(self, data: bytes):
     # remove sent/recv uel sequences
-    data = re.sub(r'' + const.UEL, '', data)
+    data = re.sub(rb'' + const.UEL, b'', data)
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     if self.mode == 'ps':
       # remove sent postscript header
-      data = re.sub(r'' + re.escape(const.PS_HEADER), '', data)
+      data = re.sub(rb'' + re.escape(const.PS_HEADER), b'', data)
       # remove sent postscript hack
-      data = re.sub(r'' + re.escape(const.PS_IOHACK), '', data)
+      data = re.sub(rb'' + re.escape(const.PS_IOHACK), b'', data)
       # remove sent delimiter token
-      data = re.sub(r'\(DELIMITER\d+\\n\) print flush\n', '', data)
+      data = re.sub(rb'\(DELIMITER\d+\\n\) print flush\n', b'', data)
       # remove recv delimiter token
-      data = re.sub(r'DELIMITER\d+', '', data)
+      data = re.sub(rb'DELIMITER\d+', b'', data)
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     elif self.mode == 'pjl':
       # remove sent/recv delimiter token
-      data = re.sub(r'@PJL ECHO\s+DELIMITER\d+', '', data)
+      data = re.sub(rb'@PJL ECHO\s+DELIMITER\d+', b'', data)
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     elif self.mode == 'pcl':
       # remove sent delimiter token
-      data = re.sub(r'\x1b\*s-\d+X', '', data)
+      data = re.sub(rb'\x1b\*s-\d+X', b'', data)
       # remove recv delimiter token
-      data = re.sub(r'PCL\x0d?\x0a?\x0c?ECHO -\d+', '', data)
+      data = re.sub(rb'PCL\x0d?\x0a?\x0c?ECHO -\d+', b'', data)
       # replace sent escape sequences
-      data = re.sub(r'(' + const.ESC + ')', '<Esc>', data)
+      data = re.sub(rb'(' + const.ESC + b')', b'<Esc>', data)
       pass
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # replace lineseps in between
-    data = re.sub(r'\x0d?\x0a?\x0c', os.linesep, data)
+    data = re.sub(rb'\x0d?\x0a?\x0c', os.linesep.encode(), data)
     # remove eot/eof sequences
     data = data.strip(const.EOF)
     return data
@@ -500,29 +500,30 @@ class conn(object):
 # ----------------------------------------------------------------------
 
 class const(): # define constants
-  SEP         = '/' # use posixoid path separator
-  EOL         = '\r\n' # line feed || carriage return
-  ESC         = '\x1b' # used to start escape sequences
-  UEL         = ESC + '%-12345X' # universal exit language
-  EOF         = EOL + '\x0c\x04' # potential end of file chars
-  DELIMITER   = "DELIMITER" # delimiter marking end of repsonse
+  SEP         = b'/' # use posixoid path separator
+  SEP_STR     = '/' # use posixoid path separator
+  EOL         = b'\r\n' # line feed || carriage return
+  ESC         = b'\x1b' # used to start escape sequences
+  UEL         = ESC + b'%-12345X' # universal exit language
+  EOF         = EOL + b'\x0c\x04' # potential end of file chars
+  DELIMITER   = b"DELIMITER" # delimiter marking end of repsonse
   #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  PS_CATCH    = '%%\[ (.*)\]%%'
-  PS_ERROR    = '%%\[ Error: (.*)\]%%'
-  PS_FLUSH    = '%%\[ Flushing: (.*)\]%%'
-  PS_PROMPT   = '>' # TBD: could be derived from PS command 'prompt'
-  PS_HEADER   = '@PJL ENTER LANGUAGE = POSTSCRIPT\n%!\n'
-  PS_GLOBAL   = 'true 0 startjob pop\n' # 'serverdict begin 0 exitserver'
-  PS_SUPER    = '\n1183615869 internaldict /superexec get exec'
-  PS_NOHOOK   = '/nohook true def\n'
-  PS_IOHACK   = '/print {(%stdout) (w) file dup 3 2 roll writestring flushfile} def\n'\
-                '/== {128 string cvs print (\\n) print} def\n'
-  PCL_HEADER  = '@PJL ENTER LANGUAGE = PCL' + EOL + ESC
+  PS_CATCH    = rb'%%\[ (.*)\]%%'
+  PS_ERROR    = rb'%%\[ Error: (.*)\]%%'
+  PS_FLUSH    = rb'%%\[ Flushing: (.*)\]%%'
+  PS_PROMPT   = b'>' # TBD: could be derived from PS command 'prompt'
+  PS_HEADER   = b'@PJL ENTER LANGUAGE = POSTSCRIPT\n%!\n'
+  PS_GLOBAL   = b'true 0 startjob pop\n' # 'serverdict begin 0 exitserver'
+  PS_SUPER    = b'\n1183615869 internaldict /superexec get exec'
+  PS_NOHOOK   = rb'/nohook true def\n'
+  PS_IOHACK   = b'/print {(%stdout) (w) file dup 3 2 roll writestring flushfile} def\n'\
+                b'/== {128 string cvs print (\\n) print} def\n'
+  PCL_HEADER  = b'@PJL ENTER LANGUAGE = PCL' + EOL + ESC
   #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   SUPERBLOCK  = '31337' # define super macro id to contain pclfs table
   BLOCKRANGE  = list(range(10000,20000)) # use those macros for file content
   FILE_EXISTS = -1 # file size to be returned if file/dir size unknown
   NONEXISTENT = -2 # file size to be returned if a file does not exist
   #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  PS_VOL      = '' # no default volume in ps (read: any, write: first)
-  PJL_VOL     = '0:' + SEP # default pjl volume name || path seperator
+  PS_VOL      = b'' # no default volume in ps (read: any, write: first)
+  PJL_VOL     = b'0:' + SEP # default pjl volume name || path seperator

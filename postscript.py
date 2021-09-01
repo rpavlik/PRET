@@ -3,6 +3,7 @@
 
 # python standard library
 import re, os, sys, string, random, json, collections
+from typing import List
 
 # local pret classes
 from printer import printer
@@ -12,27 +13,27 @@ from helper import log, output, conv, file, item, const as c
 class postscript(printer):
   # --------------------------------------------------------------------
   # send PostScript command to printer, optionally receive response
-  def cmd(self, str_send, fb=True, crop=True, binary=False):
-    str_recv = "" # response buffer
+  def cmd(self, str_send: str, fb=True, crop=True, binary=False) -> bytes:
+    bytes_recv = b"" # response buffer
     if self.iohack: str_send = '{' + str_send + '} stopped' # br-script workaround
-    token = c.DELIMITER + str(random.randrange(2**16)) # unique response delimiter
-    iohack = c.PS_IOHACK if self.iohack else ''   # optionally include output hack
-    footer = '\n(' + token + '\\n) print flush\n' # additional line feed necessary
+    token = c.DELIMITER + bytes(random.randrange(2**16)) # unique response delimiter
+    iohack = c.PS_IOHACK if self.iohack else b''   # optionally include output hack
+    footer = b'\n(' + token + b'\\n) print flush\n' # additional line feed necessary
     # send command to printer device              # to get output on some printers
     try:
-      cmd_send = c.UEL + c.PS_HEADER + iohack + str_send + footer # + c.UEL
+      cmd_send = c.UEL + c.PS_HEADER + iohack + str_send.encode() + footer # + c.UEL
       # write to logfile
       log().write(self.logfile, str_send + os.linesep)
       # sent to printer
       self.send(cmd_send)
       # use random token or error message as delimiter PS responses
-      str_recv = self.recv(token + ".*$" + "|" + c.PS_FLUSH, fb, crop, binary)
-      return self.ps_err(str_recv)
+      bytes_recv = self.recv(token + rb".*$" + rb"|" + c.PS_FLUSH, fb, crop, binary)
+      return self.ps_err(bytes_recv)
 
     # handle CTRL+C and exceptions
     except (KeyboardInterrupt, Exception) as e:
       self.reconnect(str(e))
-      return ""
+      return b""
 
   # send PostScript command, cause permanent changes
   def globalcmd(self, str_send, *stuff):
@@ -43,30 +44,30 @@ class postscript(printer):
     return self.cmd('{' + str_send + '}' + c.PS_SUPER, *stuff)
 
   # handle error messages from PostScript interpreter
-  def ps_err(self, str_recv):
+  def ps_err(self, bytes_recv: bytes) -> bytes:
     self.error = None
-    msg = item(re.findall(c.PS_ERROR, str_recv))
+    msg = item(re.findall(c.PS_ERROR, bytes_recv))
     if msg: # real postscript command errors
       output().errmsg("PostScript Error", msg)
       self.error = msg
-      str_recv = ""
+      bytes_recv = b""
     else: # printer errors or status messages
-      msg = item(re.findall(c.PS_CATCH, str_recv))
+      msg = item(re.findall(c.PS_CATCH, bytes_recv))
       if msg:
         self.chitchat("Status Message: '" + msg.strip() + "'")
-        str_recv = re.sub(r'' + c.PS_CATCH + '\r?\n', '', str_recv)
-    return str_recv
+        bytes_recv = re.sub(rb'' + c.PS_CATCH + rb'\r?\n', b'', bytes_recv)
+    return bytes_recv
 
   # disable printing hard copies of error messages
   def on_connect(self, mode):
     if mode == 'init': # only for the first connection attempt
       str_send = '(x1) = (x2) ==' # = original, == overwritten
       str_send += ' << /DoPrintErrors false >> setsystemparams'
-      str_recv = self.cmd(str_send)
+      bytes_recv = self.cmd(str_send)
       #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
       # handle devices that do not support ps output via 'print' or '=='
-      if 'x1' in str_recv or self.error: self.iohack = False # all fine
-      elif 'x2' in str_recv: # hack required to get output (e.g. brother)
+      if b'x1' in bytes_recv or self.error: self.iohack = False # all fine
+      elif b'x2' in bytes_recv: # hack required to get output (e.g. brother)
         output().errmsg('Crippled feedback', '%stdout hack enabled')
       else: # busy or not a PS printer or a silent one (e.g. Dell 3110cn)
         output().errmsg('No feedback', 'Printer busy, non-ps or silent')
@@ -77,14 +78,14 @@ class postscript(printer):
     # politely request poor man's remote postscript shell
     output().info("Launching PostScript shell. Press CTRL+D to exit.")
     try:
-      self.send(c.UEL + c.PS_HEADER + "false echo executive\n")
+      self.send(c.UEL + c.PS_HEADER + b"false echo executive\n")
       while True:
         # use postscript prompt or error message as delimiter
-        str_recv = self.recv(c.PS_PROMPT + "$|" + c.PS_FLUSH, False, False)
+        bytes_recv = self.recv(c.PS_PROMPT + b"$|" + c.PS_FLUSH, False, False)
         # output raw response from printer
-        output().raw(str_recv, "")
+        output().raw(bytes_recv, "")
         # break on postscript error message
-        if re.search(c.PS_FLUSH, str_recv): break
+        if re.search(c.PS_FLUSH, bytes_recv): break
         # fetch user input and send it to postscript shell
         self.send(eval(input("")) + "\n")
     # handle CTRL+C and exceptions
@@ -97,9 +98,9 @@ class postscript(printer):
   # check if remote volume exists
   def vol_exists(self, vol=''):
     if vol: vol = '%' + vol.strip('%') + '%'
-    str_recv = self.cmd('/str 128 string def (*)'
+    bytes_recv = self.cmd('/str 128 string def (*)'
              + '{print (\\n) print} str devforall')
-    vols = str_recv.splitlines() + ['%*%']
+    vols = bytes_recv.splitlines() + [b'%*%']
     if vol: return vol in vols # return availability
     else: return vols # return list of existing vols
 
@@ -115,9 +116,9 @@ class postscript(printer):
 
   # check if remote file exists
   def file_exists(self, path, ls=False):
-    str_recv = self.cmd('(' + path + ') status dup '
+    bytes_recv = self.cmd('(' + path + ') status dup '
              + '{pop == == == ==} if', False)
-    meta = str_recv.splitlines()
+    meta = bytes_recv.splitlines()
     # standard conform ps interpreters respond with file size + timestamps
     if len(meta) == 4:
       # timestamps however are often mixed up…
@@ -133,16 +134,16 @@ class postscript(printer):
 
   # escape postscript pathname
   def escape(self, path):
-    return path.replace('\\', '\\\\').replace('(', '\(').replace(')', '\)')
+    return path.replace('\\', '\\\\').replace('(', r'\(').replace(')', r'\)')
 
   #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   # get complete list of files and directories on remote device
-  def dirlist(self, path="", r=True):
+  def dirlist(self, path=b"", r=True) -> List[bytes]:
     if r: path = self.rpath(path)
     path = self.escape(path + self.get_sep(path))
-    vol = "" if self.vol else "%*%" # search any volume if none specified
+    vol = b"" if self.vol else b"%*%" # search any volume if none specified
     # also lists hidden .dotfiles + special treatment for brother devices
-    str_recv = self.find(vol + path + "**") or self.find(vol + path + "*")
+    str_recv = self.find(vol + path + b"**") or self.find(vol + path + b"*")
     list = {name for name in str_recv.splitlines()}
     return sorted(list)
 
@@ -163,7 +164,7 @@ class postscript(printer):
       max = len(path.split(c.SEP))
       name = c.SEP.join(name.split(c.SEP)[:max])
       # add new and non-empty filenames to list
-      if not name in cwdlist and re.sub("^(%.*%)", '', name):
+      if not name in cwdlist and re.sub(b"^(%.*%)", b'', name):
         cwdlist.append(name)
     # get metadata for files in cwd
     for name in cwdlist:
@@ -197,7 +198,7 @@ class postscript(printer):
       arg = eval(input("Directory: "))
     # writing to dir/file should automatically create dir/
     # .dirfile is not deleted as empty dirs are not listed
-    self.put(self.rpath(arg) + c.SEP + '.dirfile', '')
+    self.put(self.rpath(arg) + c.SEP + b'.dirfile', '')
 
   # ------------------------[ get <file> ]------------------------------
   def get(self, path, size=None):
@@ -233,15 +234,15 @@ class postscript(printer):
   # ------------------------[ delete <file> ]---------------------------
   def delete(self, arg):
     path = self.rpath(arg)
-    self.cmd('(' + path + ') deletefile', False)
+    self.cmd('(' + path.decode() + ') deletefile', False)
 
   # ------------------------[ rename <old> <new> ]----------------------
   def do_rename(self, arg):
-    arg = re.split("\s+", arg, 1)
+    arg = re.split(r"\s+", arg, 1)
     if len(arg) > 1:
       old = self.rpath(arg[0])
       new = self.rpath(arg[1])
-      self.cmd('(' + old + ') (' + new + ') renamefile', False)
+      self.cmd('(' + old.decode() + ') (' + new.decode() + ') renamefile', False)
     else:
       self.onecmd("help rename")
 
@@ -255,7 +256,7 @@ class postscript(printer):
   # ------------------------[ id ]--------------------------------------
   def do_id(self, *arg):
     "Show device information."
-    output().info(self.cmd('product print'))
+    output().info(self.cmd('product print').decode())
 
   # ------------------------[ version ]---------------------------------
   def do_version(self, *arg):
@@ -336,8 +337,8 @@ class postscript(printer):
     str_send = '/str 128 string def (*) {print (\\n) print} str /IODevice resourceforall'
     for dev in self.cmd(str_send).splitlines():
       output().info(dev)
-      output().raw(self.cmd('(' + dev + ') currentdevparams {exch 128 string '
-                          + 'cvs print (: ) print ==} forall') + os.linesep)
+      output().raw(self.cmd('(' + dev.decode() + ') currentdevparams {exch 128 string '
+                          + 'cvs print (: ) print ==} forall').decode() + os.linesep)
 
   # ------------------------[ uptime ]----------------------------------
   def do_uptime(self, arg):
@@ -441,16 +442,16 @@ class postscript(printer):
     else:
       output().warning("Warning: Initializing the printer's file system will whipe-out all")
       output().warning("user data (e.g. stored jobs) on the volume. Press CTRL+C to abort.")
-      if output().countdown("Initializing " + self.vol + " in...", 10, self):
-        str_recv = self.cmd('statusdict begin (' + self.vol + ') () initializedisk end', False)
+      if output().countdown("Initializing " + self.vol.decode() + " in...", 10, self):
+        str_recv = self.cmd('statusdict begin (' + self.vol.decode() + ') () initializedisk end', False)
 
   # ------------------------[ disable ]---------------------------------
   def do_disable(self, arg):
     output().psonly()
-    before = 'true' in self.globalcmd('userdict /showpage known dup ==\n'
+    before = b'true' in self.globalcmd('userdict /showpage known dup ==\n'
                                       '{userdict /showpage undef}\n'
                                       '{/showpage {} def} ifelse')
-    after = 'true' in self.cmd('userdict /showpage known ==')
+    after = b'true' in self.cmd('userdict /showpage known ==')
     if before == after: output().info("Not available") # no change
     elif before: output().info("Printing is now enabled")
     elif after: output().info("Printing is now disabled")
@@ -530,14 +531,14 @@ class postscript(printer):
 
   # ------------------------[ cross <text> <font> ]---------------------
   def do_cross(self, arg):
-    arg = re.split("\s+", arg, 1)
+    arg = re.split(r"\s+", arg, 1)
     if len(arg) > 1 and arg[0] in self.options_cross:
       font, text = arg
       text = text.strip('"')
-      data = file().read(self.fontdir + font + ".pfa") or ""
-      data += '\n/' + font + ' findfont 50 scalefont setfont\n'\
-              '80 185 translate 52.6 rotate 1.1 1 scale 275 -67 moveto\n'\
-              '(' + text  + ') dup stringwidth pop 2 div neg 0 rmoveto show'
+      data = file().read(self.fontdir + font + ".pfa") or b""
+      data += b'\n/' + font.encode() + b' findfont 50 scalefont setfont\n'\
+              b'80 185 translate 52.6 rotate 1.1 1 scale 275 -67 moveto\n'\
+              b'(' + text.encode()  + b') dup stringwidth pop 2 div neg 0 rmoveto show'
       self.overlay(data)
     else:
       self.onecmd("help cross")
@@ -655,16 +656,16 @@ class postscript(printer):
         '  resetfile (Size: ) print dup bytesavailable ==   % get file size\n'
         '  100 {dup 128 string readline {(%%) anchorsearch  % get metadata\n'
         '  {exch print (\\n) print} if pop}{pop exit} ifelse} repeat pop\n'
-        '  (' + c.DELIMITER + '\\n) print\n'
+        '  (' + c.DELIMITER.decode() + '\\n) print\n'
         '} forall clear} if')
       # grep for metadata in captured jobs
       jobs = []
       for val in [_f for _f in str_recv.split(c.DELIMITER) if _f]:
-        date = conv().timediff(item(re.findall('Date: (.*)', val)))
-        size = conv().filesize(item(re.findall('Size: (.*)', val)))
-        user = item(re.findall('For: (.*)', val))
-        name = item(re.findall('Title: (.*)', val))
-        soft = item(re.findall('Creator: (.*)', val))
+        date = conv().timediff(item(re.findall(b'Date: (.*)', val)))
+        size = conv().filesize(item(re.findall(b'Size: (.*)', val)))
+        user = item(re.findall(b'For: (.*)', val))
+        name = item(re.findall(b'Title: (.*)', val))
+        soft = item(re.findall(b'Creator: (.*)', val))
         jobs.append((date, size, user, name, soft))
       # output metadata for captured jobs
       if jobs:
@@ -685,7 +686,7 @@ class postscript(printer):
           self.makedirs(root)
           # download captured job
           output().raw("Receiving " + lpath)
-          data = '%!\n'
+          data = b'%!\n'
           data += self.cmd('/byte (0) def\n'
             'capturedict ' + job + ' get dup resetfile\n'
             '{dup read {byte exch 0 exch put\n'
@@ -813,9 +814,9 @@ class postscript(printer):
       output().chitchat(desc)
       commands = ['(' + func  + ': ) print systemdict /'
                + func + ' known ==' for func in funcs]
-      str_recv = self.cmd(c.EOL.join(commands), False)
+      str_recv = self.cmd(c.EOL.join(commands).decode(), False)
       for line in str_recv.splitlines():
-        output().green(line) if " true" in line else output().warning(line)
+        output().green(line) if b" true" in line else output().warning(line)
 
   # ------------------------[ search <key> ]----------------------------
   def do_search(self, arg):
@@ -835,7 +836,7 @@ class postscript(printer):
                           '( ) print dup length 128 string cvs print\n'
                           '( ) print maxlength  128 string cvs print')
       if len(str_recv.split()) == 3:
-        output().info("%-5s %-5s %-5s %s" % tuple(str_recv.split() + [dict]))
+        output().info("%-5s %-5s %-5s %s" % tuple(str_recv.split() + [dict.encode()]))
 
   # ------------------------[ dump <dict> ]-----------------------------
   def do_dump(self, arg, resource=False):

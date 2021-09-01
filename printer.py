@@ -27,10 +27,10 @@ class printer(cmd.Cmd, object):
   error = None
   iohack = True
   timeout = 10
-  target = ""
-  vol = ""
-  cwd = ""
-  traversal = ""
+  target = b""
+  vol = b""
+  cwd = b""
+  traversal = b""
   # can be changed
   editor = 'vim' # set to nano/edit/notepad/leafpad/whatever
 
@@ -49,7 +49,7 @@ class printer(cmd.Cmd, object):
       header = None
       if self.mode == 'ps': header = c.PS_HEADER
       if self.mode == 'pcl': header = c.PCL_HEADER
-      if header: log().write(self.logfile, header + os.linesep)
+      if header: log().write(self.logfile, header.decode() + os.linesep)
     # run pret cmds from file
     if args.load:
       self.do_load(args.load)
@@ -140,22 +140,22 @@ class printer(cmd.Cmd, object):
     "Run commands from file:  load cmd.txt"
     if not arg:
       arg = eval(input("File: "))
-    data = file().read(arg) or ""
+    data = file().read(arg) or b""
     for cmd in data.splitlines():
       # simulate command prompt
-      print((self.prompt + cmd))
+      print((self.prompt + cmd.decode()))
       # execute command with premcd
       self.onecmd(self.precmd(cmd))
 
   # ------------------------[ loop <cmd> <arg1> <arg2> … ]--------------
   def do_loop(self, arg):
     "Run command for multiple arguments:  loop <cmd> <arg1> <arg2> …"
-    args = re.split("\s+", arg)
+    args = re.split(rb"\s+", arg)
     if len(args) > 1:
       cmd = args.pop(0)
       for arg in args:
-        output().chitchat("Executing command: '" + cmd + " " + arg + "'")
-        self.onecmd(cmd + " " + arg)
+        output().chitchat("Executing command: '" + cmd.decode() + " " + arg.decode() + "'")
+        self.onecmd(cmd + b" " + arg)
     else:
       self.onecmd("help loop")
 
@@ -178,7 +178,7 @@ class printer(cmd.Cmd, object):
       self.conn = conn(self.mode, self.debug, self.quiet)
       self.conn.timeout(self.timeout)
       self.conn.open(arg)
-      print(("Connection to " + arg + " established"))
+      print(("Connection to " + arg.decode() + " established"))
       # hook method executed after successful connection
       self.on_connect(mode)
       # show some information about the device
@@ -201,7 +201,7 @@ class printer(cmd.Cmd, object):
 
   # wrapper to recv data
   def recv(self, *args):
-    return self.conn.recv_until(*args) if self.conn else ""
+    return self.conn.recv_until(*args) if self.conn else b""
 
   # ------------------------[ close ]-----------------------------------
   def do_close(self, *arg):
@@ -258,7 +258,7 @@ class printer(cmd.Cmd, object):
   # ------------------------[ pwd ]-------------------------------------
   def do_pwd(self, arg):
     "Show working directory on remote device."
-    path = ('' if self.vol else c.SEP) + self.rpath()
+    path = (b'' if self.vol else c.SEP) + self.rpath()
     output().raw(path)
 
   # ------------------------[ chvol <volume> ]--------------------------
@@ -266,10 +266,11 @@ class printer(cmd.Cmd, object):
     "Change remote volume:  chvol <volume>"
     if not arg:
       arg = eval(input("Volume: "))
+      arg = arg.encode()
     if arg and self.vol_exists(arg):
-      if self.mode == 'ps':  self.set_vol('%' + arg.strip('%') + '%')
-      if self.mode == 'pjl': self.set_vol(arg[0] + ':' + c.SEP)
-      print(("Volume changed to " + self.vol))
+      if self.mode == 'ps':  self.set_vol(b'%' + arg.strip(b'%') + b'%')
+      if self.mode == 'pjl': self.set_vol(arg[0] + b':' + c.SEP)
+      print(("Volume changed to " + self.vol.decode()))
     else:
       print("Volume not available")
 
@@ -288,7 +289,7 @@ class printer(cmd.Cmd, object):
   # get volume
   def get_vol(self):
     vol = self.vol
-    if vol and self.mode == 'ps' : vol = vol.strip('%')
+    if vol and self.mode == 'ps' : vol = vol.strip(b'%')
     if vol and self.mode == 'pjl': vol = vol[0]
     return vol
 
@@ -302,7 +303,7 @@ class printer(cmd.Cmd, object):
       print("Cannot use this path traversal.")
 
   # set path traversal
-  def set_traversal(self, traversal=''):
+  def set_traversal(self, traversal=b''):
     self.traversal = traversal
     if not traversal: self.set_cwd()
 
@@ -310,7 +311,7 @@ class printer(cmd.Cmd, object):
   def do_cd(self, arg):
     "Change remote working directory:  cd <path>"
     if not self.cpath(arg) or self.dir_exists(self.rpath(arg)):
-      if re.match("^[\." + c.SEP + "]+$", self.cpath(arg)):
+      if re.match(rb"^[\." + c.SEP + rb"]+$", self.cpath(arg)):
         output().raw("*** Congratulations, path traversal found ***")
         output().chitchat("Consider setting 'traversal' instead of 'cd'.")
       self.set_cwd(arg)
@@ -318,32 +319,32 @@ class printer(cmd.Cmd, object):
       print("Failed to change directory.")
 
   # set current working directory
-  def set_cwd(self, cwd=''):
-    self.cwd = self.cpath(cwd) if cwd else ""
+  def set_cwd(self, cwd=b''):
+    self.cwd = self.cpath(cwd) if cwd else b""
     self.set_prompt()
 
   # set command prompt
   def set_prompt(self):
-    target = self.target + ":" if self.conn else ""
-    cwd = self.cwd if self.conn else ""
-    self.prompt = target + c.SEP + cwd + "> "
+    target = self.target.decode() + ":" if self.conn else ""
+    cwd = self.cwd.decode() if self.conn else ""
+    self.prompt = target + c.SEP_STR + cwd + "> "
 
   # get seperator
-  def get_sep(self, path):
+  def get_sep(self, path: bytes) -> bytes:
     # don't add seperator between ps volume and filename
-    if self.mode == 'ps' and re.search("^%.*%$", path): return ''
+    if self.mode == 'ps' and re.search(b"^%.*%$", path): return b''
     # add seperator if we have to deal with a directory
-    return c.SEP if (path or self.cwd or self.traversal) else ''
+    return c.SEP if (path or self.cwd or self.traversal) else b''
 
   # --------------------------------------------------------------------
   # get path without traversal and cwd information
-  def tpath(self, path):
+  def tpath(self, path: bytes) -> bytes:
     # remove leading seperators
     path = path.lstrip(c.SEP)
     return self.vol + self.normpath(path)
 
   # get path without volume and traversal information
-  def cpath(self, path):
+  def cpath(self, path: bytes) -> bytes:
     # generate virtual path on remote device
     path = c.SEP.join((self.cwd, path))
     # remove leading seperators
@@ -351,7 +352,7 @@ class printer(cmd.Cmd, object):
     return self.normpath(path)
 
   # get path without volume information
-  def vpath(self, path):
+  def vpath(self, path: bytes) -> bytes:
     # generate virtual path on remote device
     path = c.SEP.join((self.traversal, self.cwd, path))
     # remove leading seperators
@@ -359,9 +360,9 @@ class printer(cmd.Cmd, object):
     return self.normpath(path)
 
   # get path with volume information
-  def rpath(self, path=""):
+  def rpath(self, path=b"") -> bytes:
     # warn if path contains volume information
-    if (path.startswith("%") or path.startswith('0:')) and not self.fuzz:
+    if (path.startswith(b"%") or path.startswith(b'0:')) and not self.fuzz:
       output().warning("Do not refer to disks directly, use chvol.")
     # in fuzzing mode leave remote path as it is
     if self.fuzz: return path
@@ -369,8 +370,8 @@ class printer(cmd.Cmd, object):
     return self.vol + self.vpath(path)
 
   # get normalized pathname
-  def normpath(self, path):
-    path = posixpath.normpath(path)
+  def normpath(self, path: bytes) -> bytes:
+    path = posixpath.normpath(path.decode()).encode()
     '''
     ┌───────────────────────────────────────────────────────┐
     │        problems when using posixpath.normpath         │
@@ -382,7 +383,7 @@ class printer(cmd.Cmd, object):
     '''
     ### path = re.sub(r"(/)", "\\\\", path)      ### Epson/Samsung PJL
     ### path = re.sub(r"(/\.\.)", "/../.", path) ### HP path traversal
-    return path if path != '.' else ''
+    return path if path != b'.' else b''
 
   # --------------------------------------------------------------------
   # get filename, independent of path naming convention
@@ -408,7 +409,7 @@ class printer(cmd.Cmd, object):
       if lsize != rsize and len(conv().nstrip(data)) == rsize:
         lsize, data = rsize, conv().nstrip(data)
       # write to local file
-      file().write(lpath, data.encode())
+      file().write(lpath, data)
       if lsize == rsize:
         print((str(lsize) + " bytes received."))
       else:
@@ -443,11 +444,11 @@ class printer(cmd.Cmd, object):
   # ------------------------[ append <file> <string> ]------------------
   def do_append(self, arg):
     "Append to file:  append <file> <string>"
-    arg = re.split("\s+", arg, 1)
+    arg = re.split(b"\s+", arg, 1)
     if len(arg) > 1:
       path, data = arg
       rpath = self.rpath(path)
-      data = data + os.linesep
+      data = data + os.linesep.encode()
       self.append(rpath, data)
     else:
       self.onecmd("help append")
@@ -512,7 +513,7 @@ class printer(cmd.Cmd, object):
   # ------------------------[ mirror <path> ]---------------------------
   def mirror(self, name, size):
     target, vol = self.basename(self.target), self.get_vol()
-    root = os.path.abspath(os.path.join('mirror', target, vol))
+    root = os.path.abspath(os.path.join(b'mirror', target, vol))
     lpath = os.path.join(root, name)
     '''
     ┌───────────────────────────────────────────────────────────┐
@@ -530,7 +531,7 @@ class printer(cmd.Cmd, object):
     └───────────────────────────────────────────────────────────┘
     '''
     # replace path traversal (poor man's version)
-    lpath = re.sub(r'(\.)+' + c.SEP, '', lpath)
+    lpath = re.sub(rb'(\.)+' + c.SEP, b'', lpath)
     # abort if we are still out of the mirror root
     if not os.path.realpath(lpath).startswith(root):
       output().errmsg("Not saving data out of allowed path",

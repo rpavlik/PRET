@@ -81,11 +81,11 @@ class pcl(printer):
   # get list of macro ids on printer device
   def idlist(self):
     list = []
-    str_send = '*s4T'          # set location type (downloaded)
-    str_send += c.ESC + '*s0U' # set location unit (all units)
-    str_send += c.ESC + '*s1I' # set inquire entity (macros)
+    str_send = b'*s4T'          # set location type (downloaded)
+    str_send += c.ESC + b'*s0U' # set location unit (all units)
+    str_send += c.ESC + b'*s1I' # set inquire entity (macros)
     str_recv = self.cmd(str_send)
-    idlist = re.findall('IDLIST="(.*),?"', str_recv) ### maybe this can
+    idlist = re.findall(b'IDLIST="(.*),?"', str_recv) ### maybe this can
     for id in item(idlist).split(","):               ### be packed into
       if id.startswith('1'): list.append(int(id))    ### a single regex
     return list
