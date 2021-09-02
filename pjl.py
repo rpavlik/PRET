@@ -46,11 +46,11 @@ class pjl(printer):
       return b""
 
   # handle error messages from PJL interpreter
-  def pjl_err(self, bytes_recv, str_stat):
+  def pjl_err(self, bytes_recv: bytes, bytes_stat: bytes):
     # show file error messages
     self.fileerror(bytes_recv)
     # show PJL status messages
-    self.showstatus(str_stat)
+    self.showstatus(bytes_stat)
     # but return buffer anyway
     return bytes_recv
 
@@ -66,23 +66,23 @@ class pjl(printer):
     print(("Status messages enabled" if self.status else "Status messages disabled"))
 
   # parse PJL status message
-  def showstatus(self, str_stat: str):
-    codes = {}; messages = {}
+  def showstatus(self, bytes_stat: bytes):
+    codes: Dict[bytes, bytes]= {}; messages: Dict[bytes, bytes] = {}
     # get status codes
-    for (num, code) in re.findall(r'CODE(\d+)?\s*=\s*(\d+)', str_stat):
+    for (num, code) in re.findall(rb'CODE(\d+)?\s*=\s*(\d+)', bytes_stat):
       codes[num] = code
     # get status messages
-    for (num, mstr) in re.findall(r'DISPLAY(\d+)?\s*=\s*"(.*)"', str_stat):
+    for (num, mstr) in re.findall(rb'DISPLAY(\d+)?\s*=\s*"(.*)"', bytes_stat):
       messages[num] = mstr
     # show codes and messages
     for num, code in list(codes.items()):
-      message = messages[num] if num in messages else "UNKNOWN STATUS"
+      message = messages[num] if num in messages else b"UNKNOWN STATUS"
       # workaround for hp printers with wrong range
-      if code.startswith("32"):
-        code = str(int(code) - 2000)
+      if code.startswith(b"32"):
+        code = str(int(code) - 2000).encode()
       # show status from display and codebook
-      error = item(codebook().get_errors(code), 'Unknown status')
-      output().errmsg("CODE " + code + ": " + message, error)
+      error = item(codebook().get_errors(code), b'Unknown status')
+      output().errmsg(b"CODE " + code + b": " + message, error)
 
   # parse PJL file errors
   def fileerror(self, bytes_recv: bytes):
@@ -203,8 +203,8 @@ class pjl(printer):
     "List contents of remote directory:  ls <path>"
     list = self.dirlist(arg, sep=False, hidden=True)
     # remove '.' and '..' from non-empty directories
-    if set(list).difference(('.', '..')):
-      for key in set(list).intersection(('.', '..')): del list[key]
+    if set(list).difference((b'.', b'..')):
+      for key in set(list).intersection((b'.', b'..')): del list[key]
     # list files with syntax highlighting
     for name, size in sorted(list.items()):
       output().pjldir(name, size)

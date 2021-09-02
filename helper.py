@@ -6,7 +6,8 @@
 from socket import socket
 import sys, os, re, stat, math, time, datetime
 import importlib
-from typing import Tuple
+from typing import Tuple, Union
+from typing_extensions import Literal
 
 # third party modules
 try: # unicode monkeypatch for windoze
@@ -90,47 +91,71 @@ class log():
 
 class output():
   # show send commands (debug mode)
-  def send(self, str, mode):
-    if str: print(Back.CYAN + str + Style.RESET_ALL)
+  def send(self, str: bytes, mode: Union[bool, Literal['hex']]):
+    try:
+      if str: print(Back.CYAN + str.decode() + Style.RESET_ALL)
+    except:
+      pass
     if str and mode == 'hex':
       print(Fore.CYAN + conv().hex(str, ':') + Style.RESET_ALL)
 
   # show recv commands (debug mode)
-  def recv(self, str, mode):
-    if str: print(Back.MAGENTA + str + Style.RESET_ALL)
+  def recv(self, str: bytes, mode: Union[bool, Literal['hex']]):
+    try:
+      if str: print(Back.MAGENTA + str.decode() + Style.RESET_ALL)
+    except:
+      pass
     if str and mode == 'hex':
       print(Fore.MAGENTA + conv().hex(str, ':') + Style.RESET_ALL)
 
   # show information
-  def info(self, msg, eol=None):
-    if msg: print(Back.BLUE + msg + Style.RESET_ALL, end=eol)
+  def info(self, msg: Union[str, bytes, None], eol=None):
+    if msg:
+      if isinstance(msg, bytes):
+        msg = msg.decode()
+      print(Back.BLUE + msg + Style.RESET_ALL, end=eol)
     sys.stdout.flush()
 
   # show raw data
-  def raw(self, msg, eol=None):
-    if msg: print(Fore.YELLOW + msg + Style.RESET_ALL, end=eol)
+  def raw(self, msg: Union[str, bytes, None], eol=None):
+    if msg:
+      if isinstance(msg, bytes):
+        msg = msg.decode()
+      print(Fore.YELLOW + msg + Style.RESET_ALL, end=eol)
     sys.stdout.flush()
 
   # show chit-chat
-  def chitchat(self, msg, eol=None):
-    if msg: print(Style.DIM + msg + Style.RESET_ALL, end=eol)
+  def chitchat(self, msg: Union[str, bytes, None], eol=None):
+    if msg:
+      if isinstance(msg, bytes):
+        msg = msg.decode()
+      print(Style.DIM + msg + Style.RESET_ALL, end=eol)
     sys.stdout.flush()
 
   # show warning message
-  def warning(self, msg):
-    if msg: print(Back.RED + msg + Style.RESET_ALL)
+  def warning(self, msg: Union[str, bytes, None]):
+    if msg:
+      if isinstance(msg, bytes):
+        msg = msg.decode()
+      print(Back.RED + msg + Style.RESET_ALL)
 
   # show green message
-  def green(self, msg):
-    if msg: print(Back.GREEN + msg + Style.RESET_ALL)
+  def green(self, msg: Union[str, bytes, None]):
+    if msg:
+      if isinstance(msg, bytes):
+        msg = msg.decode()
+      print(Back.GREEN + msg + Style.RESET_ALL)
 
   # show error message
-  def errmsg(self, msg, info=""):
+  def errmsg(self, msg: Union[str, bytes, None], info=""):
     info = str(info).strip()
     if info: # monkeypatch to make python error message less ugly
       info = item(re.findall(r'Errno -?\d+\] (.*)', info), '') or info.splitlines()[-1]
       info = Style.RESET_ALL + Style.DIM + " (" + info.strip('<>') + ")" + Style.RESET_ALL
-    if msg: print(Back.RED + msg + info)
+    if msg:
+      if isinstance(msg, bytes):
+        msg = msg.decode()
+      print(Back.RED + msg + info)
 
   # show printer and status
   def discover(self, xxx_todo_changeme):
@@ -320,8 +345,8 @@ class conv():
     return re.sub(rb'\r\n', b'\n', data)
 
   # convert string to hexdecimal
-  def hex(self, data, sep=''):
-    return sep.join("{:02x}".format(ord(c)) for c in data)
+  def hex(self, data: bytes, sep=''):
+    return sep.join("{:02x}".format(c) for c in data)
 
   # convert to ascii character
   def chr(self, num):
@@ -476,7 +501,7 @@ class conn(object):
     return data
 
   # beautify debug output
-  def beautify(self, data: bytes):
+  def beautify(self, data: bytes) -> bytes:
     # remove sent/recv uel sequences
     data = re.sub(rb'' + const.UEL, b'', data)
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

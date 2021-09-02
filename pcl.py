@@ -13,7 +13,7 @@ class pcl(printer):
   # send PCL command to printer, optionally receive response
   def cmd(self, bytes_send, fb=True):
     bytes_recv = b"" # response buffer
-    token = bytes(random.randrange(2**8, 2**15) * -1) # -256..-32767
+    token = str(random.randrange(2**8, 2**15) * -1).encode() # -256..-32767
     footer = c.ESC + b'*s' + token + b'X' # echo delimiter
     # send command to printer device
     try:
