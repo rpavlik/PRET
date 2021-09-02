@@ -27,6 +27,7 @@ except ImportError:
     GREEN     = '\x1b[42m' if os.name == 'posix' else ''
     MAGENTA   = '\x1b[45m' if os.name == 'posix' else ''
     RED       = '\x1b[41m' if os.name == 'posix' else ''
+    YELLOW    = '\x1b[33m' if os.name == 'posix' else ''
   class Fore():
     BLUE      = '\x1b[34m' if os.name == 'posix' else ''
     CYAN      = '\x1b[36m' if os.name == 'posix' else ''
@@ -222,6 +223,7 @@ class output():
     if isinstance(data, list):
       data = dict(enumerate(data))
     # data now is expected to be a dictionary
+    last = None
     if len(list(data.keys())) > 0: last = sorted(data.keys())[-1]
     for key, val in sorted(data.items()):
       type  = val['type'].replace('type', '')
@@ -419,6 +421,8 @@ class conn(object):
     sleep = 0.01 # pause in recv loop
     limit = 3.0 # max watchdog overrun
     wd = 0.0 # watchdog timeout counter
+    wd_old = 0.0
+    nbytes = 0
     r = re.compile(delimiter, re.DOTALL)
     s = re.compile(rb"^\x04?\x0d?\x0a?" + delimiter, re.DOTALL)
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -428,7 +432,8 @@ class conn(object):
       wd += sleep       # workaround for endless loop w/o socket timeout
       time.sleep(sleep) # happens on some devices - python socket error?
       # timeout plus it seems we are not receiving data anymore
-      if wd > self._sock.gettimeout() and wd >= wd_old + limit:
+      sock_timeout = self._sock.gettimeout()
+      if sock_timeout and wd > sock_timeout and wd >= wd_old + limit:
         if len(data) == nbytes:
           output().errmsg("Receiving data failed", "watchdog timeout")
           break
