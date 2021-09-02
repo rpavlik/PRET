@@ -3,7 +3,7 @@
 
 # python standard library
 import re, os, random, posixpath
-from typing import List, Union
+from typing import Dict, List, Union
 
 # local pret classes
 from printer import printer
@@ -13,7 +13,7 @@ from helper import log, output, conv, file, item, chunks, const as c
 class pjl(printer):
   # --------------------------------------------------------------------
   # send PJL command to printer, optionally receive response
-  def cmd(self, bytes_send: bytes, wait=True, crop=True, binary=False) -> bytes:
+  def cmd(self, bytes_send: bytes, wait=True, crop=True, binary=False, *args, **kwargs) -> bytes:
     bytes_recv = b"" # response buffer
     str_stat = b"" # status buffer
     token = c.DELIMITER + bytes(random.randrange(2**16)) # unique delimiter
@@ -162,7 +162,7 @@ class pjl(printer):
     # get dirlist, set new remote path
     newpath = self.cwd + c.SEP + path.encode()
     if not self.options_rdirs or newpath != self.oldpath_rdirs:
-      self.options_rdirs = self.dirlist(path, True, False, True)
+      self.options_rdirs = self.dirlist(path, sep=True, hidden=False, dirsonly=True)
       self.oldpath_rdirs = newpath
     # options_rdirs contains basenames
     text = self.basename(text)
@@ -177,7 +177,7 @@ class pjl(printer):
 
   #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   # get list of files and directories on remote device
-  def dirlist(self, path, sep=True, hidden=False, dirsonly=False, r=True):
+  def dirlist(self, path, sep=True, hidden=False, dirsonly=False, r=True) -> Union[List[bytes], Dict]:
     # get remote path if not in recursive mode
     if r: path = self.rpath(path)
     # receive list of files on remote device
@@ -186,9 +186,11 @@ class pjl(printer):
     for item in bytes_recv.splitlines():
       # get directories
       dirname = re.findall(rb"^(.*)\s+TYPE\s*=\s*DIR$", item)
-      if dirname and (dirname[0] not in ("", ".", "..") or hidden):
-        sep = c.SEP if sep and dirname[0][-1:] != c.SEP else ''
-        list[dirname[0] + sep] = None
+      if dirname:
+        name: bytes = dirname[0]
+        if name not in ("", ".", "..") or hidden:
+          sep = c.SEP if sep and name[-1:] != c.SEP else b''
+        list[name + sep] = None
       # get files
       filename = re.findall(rb"^(.*)\s+TYPE\s*=\s*FILE", item)
       filesize = re.findall(rb"FILE\s+SIZE\s*=\s*(\d*)", item)
@@ -199,7 +201,7 @@ class pjl(printer):
   # ------------------------[ ls <path> ]-------------------------------
   def do_ls(self, arg: str):
     "List contents of remote directory:  ls <path>"
-    list = self.dirlist(arg, False, True)
+    list = self.dirlist(arg, sep=False, hidden=True)
     # remove '.' and '..' from non-empty directories
     if set(list).difference(('.', '..')):
       for key in set(list).intersection(('.', '..')): del list[key]
@@ -263,7 +265,7 @@ class pjl(printer):
     if not recursive: arg = self.vpath(arg)
     # add volume information to pathname
     path = self.vol + self.normpath(arg)
-    list = self.dirlist(path, True, False, False, False)
+    list = self.dirlist(path, sep=True, hidden=False, dirsonly=False, r=False)
     # for files in current directory
     for name, size in sorted(list.items()):
       name = self.normpath(arg) + self.get_sep(arg) + name

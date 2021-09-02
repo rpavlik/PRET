@@ -91,14 +91,12 @@ class pcl(printer):
     return list
 
   # get list of files on virtual file system
-  def dirlist(self, pclfs={}):
+  def dirlist(self, path: bytes=b"", r: bool=True, **kwargs):
+    pclfs = {}
     superblock = self.retrieve_data(c.SUPERBLOCK)
     if superblock: # de-serialize pclfs dictionary
       try: pclfs = json.loads(superblock)
       except: pass # non-existent or invalid superblock
-    if not pclfs:
-      # handle getting False for pclfs
-      pclfs = {}
     self.options_rfiles = pclfs
     return pclfs
 

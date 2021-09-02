@@ -3,7 +3,7 @@
 
 # python standard library
 import re, os, sys, string, random, json, collections
-from typing import List, Tuple
+from typing import List, Tuple, Union, cast
 
 # local pret classes
 from printer import printer
@@ -13,12 +13,12 @@ from helper import log, output, conv, file, item, const as c
 class postscript(printer):
   # --------------------------------------------------------------------
   # send PostScript command to printer, optionally receive response
-  def cmd(self, bytes_send: bytes, fb=True, crop=True, binary=False) -> bytes:
+  def cmd(self, bytes_send: bytes, fb=True, crop=True, binary=False, *args, **kwargs) -> bytes:
     bytes_recv = b"" # response buffer
     if self.iohack: bytes_send = b'{' + bytes_send + b'} stopped' # br-script workaround
-    token = c.DELIMITER + bytes(random.randrange(2**16)) # unique response delimiter
-    iohack = c.PS_IOHACK if self.iohack else b''   # optionally include output hack
-    footer = b'\n(' + token + b'\\n) print flush\n' # additional line feed necessary
+    token: bytes = c.DELIMITER + str(random.randrange(2**16)).encode() # unique response delimiter
+    iohack: bytes = c.PS_IOHACK if self.iohack else b''   # optionally include output hack
+    footer: bytes = b'\n(' + token + b'\\n) print flush\n' # additional line feed necessary
     # send command to printer device              # to get output on some printers
     try:
       cmd_send = c.UEL + c.PS_HEADER + iohack + bytes_send + footer # + c.UEL
@@ -114,12 +114,12 @@ class postscript(printer):
     if self.fuzz and not list: # use status instead of filenameforall
       return (self.file_exists(path) != c.NONEXISTENT)
     # use filenameforall as some ps interpreters do not support status
-    if not list: list = self.dirlist(path, False)
+    if not list: list = self.dirlist(path, r=False)
     for name in list: # use dirlist to check if directory
       if re.search(b"^(%.*%)?" + path + c.SEP, name): return True
 
-  # check if remote file exists
-  def file_exists(self, path: bytes, ls=False):
+  # get remote file data if possible
+  def ls_file_data(self, path: bytes) -> Union[int, Tuple[str, str, str]]:
     bytes_recv = self.cmd(b'(' + path + b') status dup '
              + b'{pop == == == ==} if', False)
     meta = bytes_recv.splitlines()
@@ -131,10 +131,18 @@ class postscript(printer):
       mtime = conv().lsdate(max(timestamps)) # last referenced for writing
       size  = str(conv().int(meta[2]))       # bytes (file/directory size)
       pages = str(conv().int(meta[3]))       # pages (ain't really useful)
-      return (size, otime, mtime) if ls else int(size)
+      return (size, otime, mtime)
     # broken interpreters return true only; can also mean: directory
     elif item(meta) == 'true': return c.FILE_EXISTS
     else: return c.NONEXISTENT
+
+  # check if remote file exists and get its size
+  def file_exists(self, path: bytes) -> int:
+    metadata = self.ls_file_data(path)
+    if isinstance(metadata, int):
+      return metadata
+    size, otime, mtime = metadata
+    return int(size)
 
   # escape postscript pathname
   def escape(self, path: bytes) -> bytes:
@@ -173,7 +181,7 @@ class postscript(printer):
     # get metadata for files in cwd
     for name in cwdlist:
       isdir = self.dir_exists(name, list) # check if file is directory
-      metadata = self.file_exists(name, True) if not isdir else None
+      metadata = self.ls_file_data(name) if not isdir else None
       have_metadata = False
       size, otime, mtime = None, None, None
       if metadata == c.FILE_EXISTS or isdir: # create dummy metadata
@@ -210,17 +218,17 @@ class postscript(printer):
     self.put(self.rpath(arg.encode()) + c.SEP + b'.dirfile', '')
 
   # ------------------------[ get <file> ]------------------------------
-  def get(self, path, size=None):
+  def get(self, path: bytes, size=None) -> Union[int, Tuple[int, bytes]]:
     if not size:
       size = self.file_exists(path)
     if size != c.NONEXISTENT:
       # read file, one byte at a time
-      bytes_recv = self.cmd('/byte (0) def\n'
-                        + '/infile (' + path.decode() + ') (r) file def\n'
-                        + '{infile read {byte exch 0 exch put\n'
-                        + '(%stdout) (w) file byte writestring}\n'
-                        + '{infile closefile exit} ifelse\n'
-                        + '} loop', True, True, True)
+      bytes_recv = self.cmd(b'/byte (0) def\n'
+                        + b'/infile (' + path + b') (r) file def\n'
+                        + b'{infile read {byte exch 0 exch put\n'
+                        + b'(%stdout) (w) file byte writestring}\n'
+                        + b'{infile closefile exit} ifelse\n'
+                        + b'} loop', True, True, True)
       return (size, bytes_recv)
     else:
       print("File not found.")
@@ -976,14 +984,14 @@ class postscript(printer):
     args = re.split(r"\s+", arg, 1)
     cat, dump = args[0], len(args) > 1
     self.populate_resource()
-    c = cat.encode()
-    if c in self.options_resource:
+    cat_encoded = cat.encode()
+    if cat_encoded in self.options_resource:
       bytes_send = b'(*) {128 string cvs print (\\n) print}'\
-                   b' 128 string /' + c + b' resourceforall'
+                   b' 128 string /' + cat_encoded + b' resourceforall'
       items = self.cmd(bytes_send).splitlines()
       for item in sorted(items):
         output().info(item)
-        if dump: self.do_dump((b'/' + item + b' /' + c + b' findresource').decode(), True)
+        if dump: self.do_dump((b'/' + item + b' /' + cat_encoded + b' findresource').decode(), True)
     else:
       self.onecmd("help resource")
 

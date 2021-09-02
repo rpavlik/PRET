@@ -315,7 +315,8 @@ class printer(cmd.Cmd):
 
   def dir_exists(self, vol: bytes) -> bool: raise NotImplementedError
 
-  def file_exists(self, path: bytes) -> bool: raise NotImplementedError
+  # check if remote file exists and get its size
+  def file_exists(self, path: bytes) -> int: raise NotImplementedError
 
   # ------------------------[ traversal <path> ]------------------------
   def do_traversal(self, arg: str):
@@ -711,7 +712,7 @@ class printer(cmd.Cmd):
     # 1st method: EXISTS
     opt1 = (self.dir_exists(path) or False)
     # 2nd method: DIRLIST
-    dir2 = self.dirlist(path, False)
+    dir2 = self.dirlist(path, r=False)
     opt2 = (True if dir2 else False)
     # show fuzzing results
     output().fuzzed(path, "", ('', opt1, opt2))
@@ -724,7 +725,7 @@ class printer(cmd.Cmd):
     elif opt1: # only EXISTS successful
       found[path] = None
 
-  def dirlist(self, path: bytes, *args, **kwargs): raise NotImplementedError
+  def dirlist(self, path: bytes=b"", r: bool=True, **kwargs) -> Union[List[bytes], Dict]: raise NotImplementedError
   def do_ls(self, arg: str): raise NotImplementedError
 
   # check for remote files (write)
@@ -734,7 +735,7 @@ class printer(cmd.Cmd):
     # 2nd method: EXISTS
     opt2 = (self.file_exists(path+name) != c.NONEXISTENT)
     # 3rd method: DIRLIST
-    opt3 = (name in self.dirlist(path, False))
+    opt3 = (name in self.dirlist(path, r=False))
     # show fuzzing results
     output().fuzzed(path+name, cmd, (opt1, opt2, opt3))
     return opt1
