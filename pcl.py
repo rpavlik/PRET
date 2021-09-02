@@ -96,6 +96,9 @@ class pcl(printer):
     if superblock: # de-serialize pclfs dictionary
       try: pclfs = json.loads(superblock)
       except: pass # non-existent or invalid superblock
+    if not pclfs:
+      # handle getting False for pclfs
+      pclfs = {}
     self.options_rfiles = pclfs
     return pclfs
 

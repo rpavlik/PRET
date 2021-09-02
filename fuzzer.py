@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from typing import List, Tuple, Union
+
+
 class fuzzer():
-  vol = [b"", b".", b"\\", b"/", b"file:///", b"C:/"]
-  var = [b"~", b"$HOME"]
-  win = [b"%WINDIR%", b"%SYSTEMROOT%", b"%HOMEPATH%", b"%PROGRAMFILES%"]
-  smb = [b"\\\\127.0.0.1\\"]
-  web = [b"http://127.0.0.1/"] # "http://hacking-printers.net/log.me"
-  dir = [b"..", b"...", b"...."] # also combinations like "./.."
-# sep = [b"", b"\\", b"/", b"\\\\", b"//", b"\\/"]
-  fhs = [b"/etc", b"/bin", b"/sbin", b"/home", b"/proc", b"/dev", b"/lib",
-         "/opt", b"/run",  "/sys", b"/tmp", b"/usr", b"/var", b"/mnt",]
-  abs = [b".profile", [b"etc", b"passwd"], [b"bin", b"sh"], [b"bin", b"ls"],
-         "boot.ini", [b"windows", b"win.ini"], [b"windows", b"cmd.exe"]]
-  rel = [b"%WINDIR%\\win.ini",
+  vol: List[bytes]  = [b"", b".", b"\\", b"/", b"file:///", b"C:/"]
+  var: List[bytes]  = [b"~", b"$HOME"]
+  win: List[bytes]  = [b"%WINDIR%", b"%SYSTEMROOT%", b"%HOMEPATH%", b"%PROGRAMFILES%"]
+  smb: List[bytes]  = [b"\\\\127.0.0.1\\"]
+  web: List[bytes]  = [b"http://127.0.0.1/"] # "http://hacking-printers.net/log.me"
+  dir: List[bytes]  = [b"..", b"...", b"...."] # also combinations like "./.."
+  fhs: List[bytes] = [b"/etc", b"/bin", b"/sbin", b"/home", b"/proc", b"/dev", b"/lib",
+         b"/opt", b"/run", b"/sys", b"/tmp", b"/usr", b"/var", b"/mnt",]
+  abs: List[Union[bytes, List[bytes]]] = [b".profile", [b"etc", b"passwd"], [b"bin", b"sh"], [b"bin", b"ls"],
+         b"boot.ini", [b"windows", b"win.ini"], [b"windows", b"cmd.exe"]]
+  rel: List[bytes]  = [b"%WINDIR%\\win.ini",
          b"%WINDIR%\\repair\\sam",
          b"%WINDIR%\\repair\\system",
          b"%WINDIR%\\system32\\config\\system.sav",
@@ -25,6 +27,6 @@ class fuzzer():
          b"%SYSTEMROOT%\\repair\\system"]
 
   # define prefixes to use in fuzzing modes
-  path  = vol+var+win+smb+web # path fuzzing
-  write = vol+var+win+smb+fhs # write fuzzing
-  blind = vol+var             # blind fuzzing
+  path: List[bytes]   = vol+var+win+smb+web # path fuzzing
+  write: List[bytes]  = vol+var+win+smb+fhs # write fuzzing
+  blind: List[bytes]  = vol+var             # blind fuzzing

@@ -5,6 +5,7 @@
 import re, os, sys, cmd, glob, errno, random, ntpath
 import posixpath, hashlib, tempfile, subprocess, abc
 from typing import Dict, List, Optional, Union
+from typing_extensions import Literal
 
 # local pret classes
 from helper import log, output, conv, file, item, conn, const as c
@@ -16,10 +17,10 @@ class printer(cmd.Cmd):
   intro = "Welcome to the pret shell. Type help or ? to list commands."
   doc_header = "Available commands (type help <topic>):"
   offline_str = "Not connected."
-  undoc_header = None
+  undoc_header = ''
   # do not change
   logfile = None
-  debug = False
+  debug: Union[bool, Literal['hex']] = False
   status = False
   quiet = False
   fuzz = False
@@ -27,7 +28,7 @@ class printer(cmd.Cmd):
   mode = None
   error = None
   iohack = True
-  timeout = 10
+  timeout = 10.0
   target = b""
   vol = b""
   cwd = b""
@@ -243,7 +244,7 @@ class printer(cmd.Cmd):
     return bytes_recv
 
   @abc.abstractmethod
-  def cmd(self, bytes_send, **kwargs):
+  def cmd(self, bytes_send: bytes, *args, **kwargs) -> bytes:
     raise NotImplementedError
 
   # ------------------------[ reconnect ]-------------------------------
@@ -411,19 +412,19 @@ class printer(cmd.Cmd):
 
   # --------------------------------------------------------------------
   # get filename, independent of path naming convention
-  def basename(self, path):
+  def basename(self, path: bytes) -> bytes:
     path = os.path.basename(posixpath.basename(ntpath.basename(path)))
     return path
 
   # ====================================================================
 
   # ------------------------[ get <file> ]------------------------------
-  def do_get(self, arg: str, lpath="", r=True):
+  def do_get(self, arg: str, lpath: bytes=b"", r=True):
     "Receive file:  get <file>"
     if not arg:
       arg = eval(input("Remote file: "))
     if not lpath:
-      lpath = self.basename(arg)
+      lpath = self.basename(arg.encode())
     path = self.rpath(arg.encode()) if r else arg.encode()
     bytes_recv = self.get(path)
     if bytes_recv != c.NONEXISTENT:
@@ -521,7 +522,7 @@ class printer(cmd.Cmd):
     t = tempfile.NamedTemporaryFile(delete=False)
     lpath = t.name; t.close
     # download to temporary file
-    self.do_get(arg, lpath)
+    self.do_get(arg, lpath.encode())
     # get md5sum for original file
     chksum1 = hashlib.md5(open(lpath,'rb').read()).hexdigest()
     try:
@@ -723,7 +724,7 @@ class printer(cmd.Cmd):
     elif opt1: # only EXISTS successful
       found[path] = None
 
-  def dirlist(self, path: bytes, sep: bool, **kwargs): raise NotImplementedError
+  def dirlist(self, path: bytes, *args, **kwargs): raise NotImplementedError
   def do_ls(self, arg: str): raise NotImplementedError
 
   # check for remote files (write)
@@ -765,7 +766,7 @@ class printer(cmd.Cmd):
     "Execute custom command on printer:  site <command>"
     if not arg:
       arg = eval(input("Command: "))
-    bytes_recv = self.cmd(arg)
+    bytes_recv = self.cmd(arg.encode())
     output().info(bytes_recv)
 
   # ------------------------[ print <file>|"text" ]----------------------------

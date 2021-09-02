@@ -3,6 +3,7 @@
 
 # python standard library
 import re, os, random, posixpath
+from typing import List, Union
 
 # local pret classes
 from printer import printer
@@ -12,26 +13,26 @@ from helper import log, output, conv, file, item, chunks, const as c
 class pjl(printer):
   # --------------------------------------------------------------------
   # send PJL command to printer, optionally receive response
-  def cmd(self, bytes_send, wait=True, crop=True, binary=False) -> bytes:
+  def cmd(self, bytes_send: bytes, wait=True, crop=True, binary=False) -> bytes:
     bytes_recv = b"" # response buffer
     str_stat = b"" # status buffer
     token = c.DELIMITER + bytes(random.randrange(2**16)) # unique delimiter
-    status = b'@PJL INFO STATUS' + c.EOL if self.status and wait else ''
-    footer = b'@PJL ECHO ' + token + c.EOL + c.EOL if wait else ''
+    status = b'@PJL INFO STATUS' + c.EOL if self.status and wait else b''
+    footer = b'@PJL ECHO ' + token + c.EOL + c.EOL if wait else b''
     # send command to printer device
     try:
       cmd_send = c.UEL + bytes_send + c.EOL + status + footer + c.UEL
       # write to logfile
-      log().write(self.logfile, bytes_send + os.linesep)
+      log().write(self.logfile, bytes_send + os.linesep.encode())
       # sent to printer
       self.send(cmd_send)
       # for commands that expect a response
       if wait:
         # use random token as delimiter PJL responses
-        bytes_recv = self.recv(b'(@PJL ECHO\s+)?' + token + '.*$', wait, True, binary)
+        bytes_recv = self.recv(rb'(@PJL ECHO\s+)?' + token + b'.*$', wait, True, binary)
         if self.status:
           # get status messages and remove them from received buffer
-          str_stat = item(re.findall(b"@PJL INFO STATUS.*", bytes_recv, re.DOTALL))
+          str_stat = item(re.findall(rb"@PJL INFO STATUS.*", bytes_recv, re.DOTALL))
           bytes_recv = re.compile(rb'\x0c?@PJL INFO STATUS.*', re.DOTALL).sub(b'', bytes_recv)
         if crop:
           # crop very first PJL line which is echoed by most interpreters
@@ -56,7 +57,7 @@ class pjl(printer):
   # disable unsolicited/conflicting status messages
   def on_connect(self, mode):
     if mode == 'init': # only for the first connection attempt
-      self.cmd('@PJL USTATUSOFF', False) # disable status messages
+      self.cmd(b'@PJL USTATUSOFF', False) # disable status messages
 
   # ------------------------[ status ]----------------------------------
   def do_status(self, arg: str):
@@ -65,13 +66,13 @@ class pjl(printer):
     print(("Status messages enabled" if self.status else "Status messages disabled"))
 
   # parse PJL status message
-  def showstatus(self, str_stat):
+  def showstatus(self, str_stat: str):
     codes = {}; messages = {}
     # get status codes
-    for (num, code) in re.findall('CODE(\d+)?\s*=\s*(\d+)', str_stat):
+    for (num, code) in re.findall(r'CODE(\d+)?\s*=\s*(\d+)', str_stat):
       codes[num] = code
     # get status messages
-    for (num, mstr) in re.findall('DISPLAY(\d+)?\s*=\s*"(.*)"', str_stat):
+    for (num, mstr) in re.findall(r'DISPLAY(\d+)?\s*=\s*"(.*)"', str_stat):
       messages[num] = mstr
     # show codes and messages
     for num, code in list(codes.items()):
@@ -84,9 +85,9 @@ class pjl(printer):
       output().errmsg("CODE " + code + ": " + message, error)
 
   # parse PJL file errors
-  def fileerror(self, bytes_recv):
+  def fileerror(self, bytes_recv: bytes):
     self.error = None
-    for code in re.findall("FILEERROR\s*=\s*(\d+)", bytes_recv):
+    for code in re.findall(rb"FILEERROR\s*=\s*(\d+)", bytes_recv):
       # file errors are 300xx codes
       code = "3" + code.zfill(4)
       for error in codebook().get_errors(code):
@@ -104,7 +105,7 @@ class pjl(printer):
     return [b':' + c.SEP for vol in vols]
 
   def _vols(self):
-      bytes_recv = self.cmd('@PJL INFO FILESYS')
+      bytes_recv = self.cmd(b'@PJL INFO FILESYS')
       vols = [line.lstrip()[0] for line in bytes_recv.splitlines()[1:] if line]
       return vols# return availability
 
@@ -340,7 +341,7 @@ class pjl(printer):
   # ------------------------[ printenv <variable> ]---------------------
   def do_printenv(self, arg: str):
     "Show printer environment variable:  printenv <VAR>"
-    bytes_recv = self.cmd('@PJL INFO VARIABLES')
+    bytes_recv = self.cmd(b'@PJL INFO VARIABLES')
     variables = []
     for item in bytes_recv.splitlines():
       var = re.findall(rb"^(.*)=", item)
@@ -353,7 +354,7 @@ class pjl(printer):
   options_printenv = []
   def complete_printenv(self, text, line, begidx, endidx):
     if not self.options_printenv:
-      bytes_recv = self.cmd('@PJL INFO VARIABLES')
+      bytes_recv = self.cmd(b'@PJL INFO VARIABLES')
       for item in bytes_recv.splitlines():
         match = re.findall(rb"^(.*)=", item)
         if match:
@@ -405,7 +406,7 @@ class pjl(printer):
       arg = eval(input("Message: "))
     arg = arg.strip('"') # remove quotes
     self.chitchat("Setting printer's display message to \"" + arg + "\"")
-    self.cmd('@PJL RDYMSG DISPLAY="' + arg + '"', False)
+    self.cmd(b'@PJL RDYMSG DISPLAY="' + arg.encode() + b'"', False)
 
   # ------------------------[ offline <message> ]-----------------------
   def do_offline(self, arg: str):
@@ -416,7 +417,7 @@ class pjl(printer):
     output().warning("Warning: Taking the printer offline will prevent yourself and others")
     output().warning("from printing or re-connecting to the device. Press CTRL+C to abort.")
     if output().countdown("Taking printer offline in...", 10, self):
-      self.cmd('@PJL OPMSG DISPLAY="' + arg + '"', False)
+      self.cmd(b'@PJL OPMSG DISPLAY="' + arg.encode() + b'"', False)
 
   @property
   def connected_over_inet_socket(self):
@@ -427,7 +428,7 @@ class pjl(printer):
   def do_restart(self, arg: str):
     "Restart printer."
     output().raw("Trying to restart the device via PML (Printer Managment Language)")
-    self.cmd('@PJL DMCMD ASCIIHEX="040006020501010301040104"', False)
+    self.cmd(b'@PJL DMCMD ASCIIHEX="040006020501010301040104"', False)
     if self.connected_over_inet_socket: # in case we're connected over inet socket
       output().chitchat("This command works only for HP printers. For other vendors, try:")
       output().chitchat("snmpset -v1 -c public " + self.target.decode() + " 1.3.6.1.2.1.43.5.1.1.3.1 i 4")
@@ -440,7 +441,7 @@ class pjl(printer):
       output().warning("You will not be able to reconnect anymore. Press CTRL+C to abort.")
     if output().countdown("Restoring factory defaults in...", 10, self):
       # reset nvram for pml-aware printers (hp)
-      self.cmd('@PJL DMCMD ASCIIHEX="040006020501010301040106"', False)
+      self.cmd(b'@PJL DMCMD ASCIIHEX="040006020501010301040106"', False)
       # this one might work on ancient laserjets
       self.cmd(b'@PJL SET SERVICEMODE=HPBOISEID' + c.EOL
              + b'@PJL CLEARNVRAM'                + c.EOL
@@ -507,7 +508,7 @@ class pjl(printer):
     if b'?' in jobmedia: return output().info("Not available")
     elif b'ON' in jobmedia: self.do_set('JOBMEDIA=OFF', False)
     elif b'OFF' in jobmedia: self.do_set('JOBMEDIA=ON', False)
-    jobmedia = self.cmd('@PJL DINQUIRE JOBMEDIA') or b'?'
+    jobmedia = self.cmd(b'@PJL DINQUIRE JOBMEDIA') or b'?'
     output().info("Printing is now " + jobmedia.decode())
 
   # define alias but do not show alias in help
@@ -552,7 +553,7 @@ class pjl(printer):
     self.do_reconnect()
     output().raw("Retention for future print jobs: ", '')
     hold = self.do_info('variables', '^HOLD', False)
-    output().info(item(re.findall("=(.*)\s+\[", item(item(hold)))) or 'NOT AVAILABLE')
+    output().info(item(re.findall(r"=(.*)\s+\[", item(item(hold)))) or 'NOT AVAILABLE')
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     ### Sagemcom printers: @PJL SET RETAIN_JOB_BEFORE_PRINT = ON
     ###                    @PJL SET RETAIN_JOB_AFTER_PRINT  = ON
@@ -565,10 +566,10 @@ class pjl(printer):
       bs = 2**9    # memory block size used for sampling
       max = 2**18  # maximum memory address for sampling
       steps = 2**9 # number of bytes to dump at once (feedback-performance trade-off)
-      lpath = os.path.join('nvram', self.basename(self.target)) # local copy of nvram
+      lpath = os.path.join(b'nvram', self.basename(self.target)) # local copy of nvram
       #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
       # ******* sampling: populate memspace with valid addresses ******
-      if len(re.split("\s+", arg, 1)) > 1:
+      if len(re.split(r"\s+", arg, 1)) > 1:
         memspace = []
         commands = [b'@PJL RNVRAM ADDRESS=' + str(n).encode() for n in range(0, max, bs)]
         self.chitchat("Sampling memory space (bs=" + str(bs) + ", max=" + str(max) + ")")
@@ -585,7 +586,7 @@ class pjl(printer):
       #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
       # ******* dumping: read nvram and write copy to local file ******
       commands = [b'@PJL RNVRAM ADDRESS=' + str(n).encode() for n in memspace]
-      self.chitchat("Writing copy to " + lpath)
+      self.chitchat("Writing copy to " + lpath.decode())
       if os.path.isfile(lpath): file().write(lpath, '') # empty file
       for chunk in list(chunks(commands, steps)):
         bytes_recv = self.cmd(c.EOL.join(chunk))
@@ -607,8 +608,8 @@ class pjl(printer):
     # write nvram (single byte)
     elif arg.startswith('write'):
       args = re.split(r"\s+", arg, 2)
-      if len(arg) > 2:
-        arg, addr, data = arg
+      if len(args) > 2:
+        a, addr, data = args
         self.cmd(b'@PJL SUPERUSER PASSWORD=0' + c.EOL
                + b'@PJL WNVRAM ADDRESS=' + addr.encode() + b' DATA=' + data.encode() + c.EOL
                + b'@PJL SUPERUSEROFF', False)
@@ -639,9 +640,9 @@ class pjl(printer):
     self.show_lock()
 
   def show_lock(self):
-    passwd   = self.cmd('@PJL DINQUIRE PASSWORD') or b"UNSUPPORTED"
-    cplock   = self.cmd('@PJL DINQUIRE CPLOCK')   or b"UNSUPPORTED"
-    disklock = self.cmd('@PJL DINQUIRE DISKLOCK') or b"UNSUPPORTED"
+    passwd   = self.cmd(b'@PJL DINQUIRE PASSWORD') or b"UNSUPPORTED"
+    cplock   = self.cmd(b'@PJL DINQUIRE CPLOCK')   or b"UNSUPPORTED"
+    disklock = self.cmd(b'@PJL DINQUIRE DISKLOCK') or b"UNSUPPORTED"
     if b'?' in passwd:   passwd   = b"UNSUPPORTED"
     if b'?' in cplock:   cplock   = b"UNSUPPORTED"
     if b'?' in disklock: disklock = b"UNSUPPORTED"
@@ -659,7 +660,8 @@ class pjl(printer):
     # user-supplied pin vs. 'exhaustive' key search
     if not arg:
       print("No PIN given, cracking.")
-      keyspace = [""] + list(range(1, 65536)) # protection can be bypassed with
+      keyspace: List[Union[str, int]] = [""]
+      keyspace.extend(range(1, 65536)) # protection can be bypassed with
     else:                               # empty password one some devices
       try:
         keyspace = [int(arg)]
@@ -670,21 +672,24 @@ class pjl(printer):
     steps = 500 # set to 1 to get actual PIN (instead of just unlocking)
     # unlock, bypass or crack PIN
     for chunk in (list(chunks(keyspace, steps))):
-      bytes_send = ""
+      bytes_send = b""
       pin = None
       for pin in chunk:
         # try to remove PIN protection
         bytes_send += b'@PJL JOB PASSWORD=' + str(pin).encode() + c.EOL \
                    +  b'@PJL DEFAULT PASSWORD=0' + c.EOL
       # check if PIN protection still active
-      bytes_send += '@PJL DINQUIRE PASSWORD'
+      bytes_send += b'@PJL DINQUIRE PASSWORD'
       # visual feedback on cracking process
       if len(keyspace) > 1 and pin:
-        self.chitchat("\rTrying PIN " + str(pin) + " (" + "%.2f" % (pin/655.35) + "%)", '')
+        message = "\rTrying PIN " + str(pin)
+        if not isinstance(pin, str):
+          message += " (" + "%.2f" % (pin/655.35) + "%)"
+        self.chitchat(message, '')
       # send current chunk of PJL commands
       bytes_recv = self.timeoutcmd(bytes_send, self.timeout*5)
       # seen hardcoded strings like 'ENABLED', 'ENABLE' and 'ENALBED' (sic!) in the wild
-      if bytes_recv.startswith("ENA"):
+      if bytes_recv.startswith(b"ENA"):
         if len(keyspace) == 1:
           output().errmsg("Cannot unlock", "Bad PIN")
       else:
