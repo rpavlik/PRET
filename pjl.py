@@ -16,7 +16,7 @@ class pjl(printer):
   def cmd(self, bytes_send: bytes, wait=True, crop=True, binary=False, *args, **kwargs) -> bytes:
     bytes_recv = b"" # response buffer
     str_stat = b"" # status buffer
-    token = c.DELIMITER + bytes(random.randrange(2**16)) # unique delimiter
+    token = c.DELIMITER + str(random.randrange(2**16)).encode() # unique delimiter
     status = b'@PJL INFO STATUS' + c.EOL if self.status and wait else b''
     footer = b'@PJL ECHO ' + token + c.EOL + c.EOL if wait else b''
     # send command to printer device
@@ -112,14 +112,14 @@ class pjl(printer):
 
 
   # check if remote directory exists
-  def dir_exists(self, path):
-    bytes_recv = self.cmd('@PJL FSQUERY NAME="' + path + '"', True, False)
+  def dir_exists(self, path: bytes):
+    bytes_recv = self.cmd(b'@PJL FSQUERY NAME="' + path + b'"', True, False)
     if re.search(rb"TYPE=DIR", bytes_recv):
       return True
 
   # check if remote file exists
-  def file_exists(self, path):
-    bytes_recv = self.cmd('@PJL FSQUERY NAME="' + path + '"', True, False)
+  def file_exists(self, path: bytes):
+    bytes_recv = self.cmd(b'@PJL FSQUERY NAME="' + path + b'"', True, False)
     size = re.findall(rb"TYPE\s*=\s*FILE\s+SIZE\s*=\s*(\d*)", bytes_recv)
     # return file size
     return conv().int(item(size, c.NONEXISTENT))
