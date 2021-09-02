@@ -154,12 +154,12 @@ class printer(cmd.Cmd):
   # ------------------------[ loop <cmd> <arg1> <arg2> … ]--------------
   def do_loop(self, arg: str):
     "Run command for multiple arguments:  loop <cmd> <arg1> <arg2> …"
-    args = re.split(rb"\s+", arg)
+    args: List[bytes] = re.split(rb"\s+", arg.encode())
     if len(args) > 1:
       cmd = args.pop(0)
-      for arg in args:
-        output().chitchat("Executing command: '" + cmd.decode() + " " + arg.decode() + "'")
-        self.onecmd(cmd + b" " + arg)
+      for a in args:
+        output().chitchat("Executing command: '" + cmd.decode() + " " + a.decode() + "'")
+        self.onecmd(cmd + b" " + a)
     else:
       self.onecmd("help loop")
 
@@ -171,7 +171,7 @@ class printer(cmd.Cmd):
     discovery()
 
   # ------------------------[ open <target> ]---------------------------
-  def do_open(self, arg, mode=""):
+  def do_open(self, arg: str, mode=""):
     "Connect to remote device:  open <target>"
     if not arg:
       arg = eval(input("Target: "))
@@ -206,12 +206,12 @@ class printer(cmd.Cmd):
         self.do_exit()
 
   # wrapper to send data
-  def send(self, *args):
-    if self.conn: self.conn.send(*args)
+  def send(self, data: bytes, *args):
+    if self.conn: self.conn.send(data, *args)
 
   # wrapper to recv data
-  def recv(self, *args):
-    return self.conn.recv_until(*args) if self.conn else b""
+  def recv(self, delim: bytes, *args):
+    return self.conn.recv_until(delim, *args) if self.conn else b""
 
   # ------------------------[ close ]-----------------------------------
   def do_close(self, *arg):
@@ -223,7 +223,7 @@ class printer(cmd.Cmd):
     self.set_prompt()
 
   # ------------------------[ timeout <seconds> ]-----------------------
-  def do_timeout(self, arg, quiet=False):
+  def do_timeout(self, arg: str, quiet=False):
     "Set connection timeout:  timeout <seconds>"
     try:
       if arg:
@@ -280,10 +280,10 @@ class printer(cmd.Cmd):
     "Change remote volume:  chvol <volume>"
     if not arg:
       arg = eval(input("Volume: "))
-      arg = arg.encode()
-    if arg and self.vol_exists(arg):
-      if self.mode == 'ps':  self.set_vol(b'%' + arg.strip(b'%') + b'%')
-      if self.mode == 'pjl': self.set_vol(arg[0] + b':' + c.SEP)
+    a = arg.encode()
+    if a and self.vol_exists(a):
+      if self.mode == 'ps':  self.set_vol(b'%' + a.strip(b'%') + b'%')
+      if self.mode == 'pjl': self.set_vol(bytes(a[0]) + b':' + c.SEP)
       print(("Volume changed to " + self.vol.decode()))
     else:
       print("Volume not available")
@@ -304,7 +304,7 @@ class printer(cmd.Cmd):
   def get_vol(self) -> bytes:
     vol = self.vol
     if vol and self.mode == 'ps' : vol = vol.strip(b'%')
-    if vol and self.mode == 'pjl': vol = vol[0]
+    if vol and self.mode == 'pjl': vol = bytes(vol[0])
     return vol
 
 
@@ -319,8 +319,8 @@ class printer(cmd.Cmd):
   # ------------------------[ traversal <path> ]------------------------
   def do_traversal(self, arg: str):
     "Set path traversal:  traversal <path>"
-    if not arg or self.dir_exists(self.tpath(arg)):
-      self.set_traversal(arg)
+    if not arg or self.dir_exists(self.tpath(arg.encode())):
+      self.set_traversal(arg.encode())
       print(("Path traversal " + ("" if arg else "un") + "set."))
     else:
       print("Cannot use this path traversal.")
@@ -418,7 +418,7 @@ class printer(cmd.Cmd):
   # ====================================================================
 
   # ------------------------[ get <file> ]------------------------------
-  def do_get(self, arg, lpath="", r=True):
+  def do_get(self, arg: str, lpath="", r=True):
     "Receive file:  get <file>"
     if not arg:
       arg = eval(input("Remote file: "))
@@ -447,7 +447,7 @@ class printer(cmd.Cmd):
   def put(self, path, data, **kwargs): raise NotImplementedError
 
   # ------------------------[ put <local file> ]------------------------
-  def do_put(self, arg, rpath=""):
+  def do_put(self, arg: str, rpath=""):
     "Send file:  put <local file>"
     if not arg:
       arg = eval(input("Local file: "))
@@ -471,9 +471,9 @@ class printer(cmd.Cmd):
   # ------------------------[ append <file> <string> ]------------------
   def do_append(self, arg: str):
     "Append to file:  append <file> <string>"
-    arg = re.split(rb"\s+", arg, 1)
-    if len(arg) > 1:
-      path, data = arg
+    args = re.split(rb"\s+", arg.encode(), 1)
+    if len(args) > 1:
+      path, data = args
       rpath = self.rpath(path)
       data = data + os.linesep.encode()
       self.append(rpath, data)
@@ -487,7 +487,7 @@ class printer(cmd.Cmd):
     "Update file timestamps:  touch <file>"
     if not arg:
       arg = eval(input("Remote file: "))
-    rpath = self.rpath(arg)
+    rpath = self.rpath(arg.encode())
     self.append(rpath, '')
 
   # ------------------------[ delete <file> ]---------------------------
@@ -509,7 +509,7 @@ class printer(cmd.Cmd):
     "Output remote file to stdout:  cat <file>"
     if not arg:
       arg = eval(input("Remote file: "))
-    path = self.rpath(arg)
+    path = self.rpath(arg.encode())
     str_recv = self.get(path)
     if str_recv != c.NONEXISTENT:
       rsize, data = str_recv
@@ -659,11 +659,11 @@ class printer(cmd.Cmd):
     output().fuzzed('PATH', 'COMMAND', ('GET', 'EXISTS', 'DIRLIST'))
     output().hline()
     # test data to put/append
-    data = "test"; data2 = "test2"
+    data = b"test"; data2 = b"test2"
     # try write to disk strategies
     for vol in self.volumes() + fuzzer().write:
-      sep = '' if vol[-1:] in ['', '/', '\\' ] else '/'
-      name = "dat" + str(random.randrange(10000))
+      sep = b'' if vol[-1:] in [b'', b'/', b'\\' ] else b'/'
+      name = b"dat" + bytes(random.randrange(10000))
       # FSDOWNLOAD
       self.put(vol + sep + name, data)
       fsd_worked = self.verify_write(vol+sep, name, data, 'PUT')
@@ -672,7 +672,7 @@ class printer(cmd.Cmd):
       data = (data + data2) if fsd_worked else data2
       self.verify_write(vol + sep, name, data, 'APPEND')
       # FSDELETE
-      self.do_delete(vol + sep + name)
+      self.do_delete((vol + sep + name).decode())
       output().hline()
 
   def fuzz_blind(self):
@@ -777,10 +777,10 @@ class printer(cmd.Cmd):
     └──────────────────────────────────────────────────────────┘
     '''
     if not arg: arg = eval(input('File or "text": '))
-    if arg.startswith('"'): data = arg.strip('"')     # raw text string
-    elif arg.endswith('.ps'): data = file().read(arg) # postscript file
-    else: data = self.convert(arg, 'pcl')             # anything else…
-    if data: self.send(c.UEL + data + c.UEL) # send pcl datastream to printer
+    if arg.startswith('"'): data = arg.strip('"').encode()     # raw text string
+    elif arg.endswith('.ps'): data = file().read(arg)          # postscript file
+    else: data = self.convert(arg, 'pcl')                      # anything else…
+    if data: self.send(c.UEL + data + c.UEL)                   # send pcl datastream to printer
 
   # convert image to page description language
   def convert(self, path, pdl='pcl'):

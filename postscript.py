@@ -13,17 +13,17 @@ from helper import log, output, conv, file, item, const as c
 class postscript(printer):
   # --------------------------------------------------------------------
   # send PostScript command to printer, optionally receive response
-  def cmd(self, str_send: str, fb=True, crop=True, binary=False) -> bytes:
+  def cmd(self, bytes_send: bytes, fb=True, crop=True, binary=False) -> bytes:
     bytes_recv = b"" # response buffer
-    if self.iohack: str_send = '{' + str_send + '} stopped' # br-script workaround
+    if self.iohack: bytes_send = b'{' + bytes_send + b'} stopped' # br-script workaround
     token = c.DELIMITER + bytes(random.randrange(2**16)) # unique response delimiter
     iohack = c.PS_IOHACK if self.iohack else b''   # optionally include output hack
     footer = b'\n(' + token + b'\\n) print flush\n' # additional line feed necessary
     # send command to printer device              # to get output on some printers
     try:
-      cmd_send = c.UEL + c.PS_HEADER + iohack + str_send.encode() + footer # + c.UEL
+      cmd_send = c.UEL + c.PS_HEADER + iohack + bytes_send + footer # + c.UEL
       # write to logfile
-      log().write(self.logfile, str_send + os.linesep)
+      log().write(self.logfile, bytes_send.decode() + os.linesep)
       # sent to printer
       self.send(cmd_send)
       # use random token or error message as delimiter PS responses
@@ -38,12 +38,12 @@ class postscript(printer):
       return b""
 
   # send PostScript command, cause permanent changes
-  def globalcmd(self, str_send, *stuff):
-    return self.cmd(c.PS_GLOBAL + str_send, *stuff)
+  def globalcmd(self, bytes_send: bytes, *stuff):
+    return self.cmd(c.PS_GLOBAL + bytes_send, *stuff)
 
   # send PostScript command, bypass invalid access
-  def supercmd(self, str_send, *stuff):
-    return self.cmd('{' + str_send + '}' + c.PS_SUPER, *stuff)
+  def supercmd(self, bytes_send: bytes, *stuff):
+    return self.cmd(b'{' + bytes_send + b'}' + c.PS_SUPER, *stuff)
 
   # handle error messages from PostScript interpreter
   def ps_err(self, bytes_recv: bytes) -> bytes:
@@ -63,9 +63,9 @@ class postscript(printer):
   # disable printing hard copies of error messages
   def on_connect(self, mode):
     if mode == 'init': # only for the first connection attempt
-      str_send = '(x1) = (x2) ==' # = original, == overwritten
-      str_send += ' << /DoPrintErrors false >> setsystemparams'
-      bytes_recv = self.cmd(str_send)
+      bytes_send = b'(x1) = (x2) ==' # = original, == overwritten
+      bytes_send += b' << /DoPrintErrors false >> setsystemparams'
+      bytes_recv = self.cmd(bytes_send)
       #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
       # handle devices that do not support ps output via 'print' or '=='
       if b'x1' in bytes_recv or self.error: self.iohack = False # all fine
@@ -174,10 +174,15 @@ class postscript(printer):
     for name in cwdlist:
       isdir = self.dir_exists(name, list) # check if file is directory
       metadata = self.file_exists(name, True) if not isdir else None
+      have_metadata = False
+      size, otime, mtime = None, None, None
       if metadata == c.FILE_EXISTS or isdir: # create dummy metadata
         (size, otime, mtime) = ('-', conv().lsdate(0), conv().lsdate(0))
-      elif metadata != c.NONEXISTENT: size, otime, mtime = metadata
-      if metadata != c.NONEXISTENT: # we got real or dummy metadata
+        have_metadata = True
+      elif metadata != c.NONEXISTENT and isinstance(metadata, tuple):
+        size, otime, mtime = metadata
+        have_metadata = True
+      if have_metadata: # we got real or dummy metadata
         output().psdir(isdir, size, otime, self.basename(name).decode(), mtime)
       else: output().errmsg("Crippled filename", 'Bad interpreter')
 
@@ -521,7 +526,7 @@ class postscript(printer):
 
   def overlay(self, data):
     output().psonly()
-    size = conv().filesize(len(data)).strip()
+    size = str(conv().filesize(len(data))).strip()
     self.chitchat("Injecting overlay data (" + size + ") into printer memory")
     str_send = '{overlay closefile} stopped % free memory\n'\
                '/overlay systemdict /currentfile get exec\n'\
@@ -535,9 +540,9 @@ class postscript(printer):
 
   # ------------------------[ cross <text> <font> ]---------------------
   def do_cross(self, arg: str):
-    arg = re.split(r"\s+", arg, 1)
-    if len(arg) > 1 and arg[0] in self.options_cross:
-      font, text = arg
+    args = re.split(r"\s+", arg, 1)
+    if len(args) > 1 and args[0] in self.options_cross:
+      font, text = args
       text = text.strip('"')
       data = file().read(self.fontdir + font + ".pfa") or b""
       data += b'\n/' + font.encode() + b' findfont 50 scalefont setfont\n'\
@@ -649,8 +654,8 @@ class postscript(printer):
     elif arg.startswith('list'):
       # show amount of free virtual memory left to capture print jobs
       vmem = self.cmd('vmstatus exch pop exch pop 32 string cvs print')
-      output().chitchat("Free virtual memory: " + conv().filesize(vmem)
-        + " | Limit to capture: " + conv().filesize(int(free) * 1048576))
+      output().chitchat("Free virtual memory: " + str(conv().filesize(vmem))
+        + " | Limit to capture: " + str(conv().filesize(int(free) * 1048576)))
       output().warning(self.cmd('userdict /free known {free not\n'
         '{(Memory almost full, will not capture jobs anymore) print} if}\n'
         '{(Capturing print jobs is currently not active) print} ifelse'))
@@ -697,7 +702,7 @@ class postscript(printer):
             '{dup read {byte exch 0 exch put\n'
             '(%stdout) (w) file byte writestring}\n'
             '{exit} ifelse} loop')
-          data = conv().nstrip(data) # remove carriage return chars
+          data = conv().nstrip_bytes(data) # remove carriage return chars
           print((str(len(data)) + " bytes received."))
           # write to local file
           if lpath and data: file().write(lpath, data)
@@ -819,8 +824,8 @@ class postscript(printer):
       output().chitchat(desc)
       commands = ['(' + func  + ': ) print systemdict /'
                + func + ' known ==' for func in funcs]
-      str_recv = self.cmd(c.EOL.join(commands).decode(), False)
-      for line in str_recv.splitlines():
+      bytes_recv = self.cmd(c.EOL.decode().join(commands), False)
+      for line in bytes_recv.splitlines():
         output().green(line) if b" true" in line else output().warning(line)
 
   # ------------------------[ search <key> ]----------------------------
@@ -844,7 +849,7 @@ class postscript(printer):
         output().info("%-5s %-5s %-5s %s" % tuple(str_recv.split() + [dict.encode()]))
 
   # ------------------------[ dump <dict> ]-----------------------------
-  def do_dump(self, arg, resource=False):
+  def do_dump(self, arg: str, resource=False):
     "Dump all values of a dictionary:  dump <dict>"
     dump = self.dictdump(arg, resource)
     if dump: output().psdict(dump)
@@ -853,6 +858,7 @@ class postscript(printer):
     print("Dump dictionary:  dump <dict>")
     # print("If <dict> is empty, the whole dictionary stack is dumped.")
     print("Standard PostScript dictionaries:")
+    last = None
     if len(self.options_dump) > 0: last = self.options_dump[-1]
     for dict in self.options_dump: print((('└─ ' if dict == last else '├─ ') + dict))
 
@@ -956,10 +962,10 @@ class postscript(printer):
       return json.loads(str_recv, object_pairs_hook=collections.OrderedDict, strict=False)
 
   # bad practice
-  def clean_json(self, string):
-    string = re.sub(",[ \t\r\n]+}", "}", string)
-    string = re.sub(",[ \t\r\n]+\]", "]", string)
-    return str(string, errors='ignore')
+  def clean_json(self, data: bytes) -> bytes:
+    data = re.sub(rb",[ \t\r\n]+}", b"}", data)
+    data = re.sub(rb",[ \t\r\n]+\]", b"]", data)
+    return data
 
   # ------------------------[ resource <category> [dump] ]--------------
   def do_resource(self, arg: str):

@@ -12,9 +12,9 @@ class pcl(printer):
   # --------------------------------------------------------------------
   # send PCL command to printer, optionally receive response
   def cmd(self, str_send, fb=True):
-    str_recv = "" # response buffer
-    token = str(random.randrange(2**8, 2**15) * -1) # -256..-32767
-    footer = c.ESC + '*s' + token + 'X' # echo delimiter
+    bytes_recv = b"" # response buffer
+    token = bytes(random.randrange(2**8, 2**15) * -1) # -256..-32767
+    footer = c.ESC + b'*s' + token + b'X' # echo delimiter
     # send command to printer device
     try:
       cmd_send = c.UEL + c.PCL_HEADER + str_send + footer + c.UEL
@@ -23,15 +23,15 @@ class pcl(printer):
       # sent to printer
       self.send(cmd_send)
       # use random token as delimiter for PCL responses
-      str_recv = self.recv('ECHO ' + token + '.*$', fb)
+      bytes_recv = self.recv(b'ECHO ' + token + b'.*$', fb)
       # crop all PCL lines from received buffer
-      str_recv = re.sub(r"\x0d?\x0a?\x0c?PCL.*\x0a?", '', str_recv)
-      return str_recv
+      bytes_recv = re.sub(rb"\x0d?\x0a?\x0c?PCL.*\x0a?", b'', bytes_recv)
+      return bytes_recv
 
     # handle CTRL+C and exceptions
     except (KeyboardInterrupt, Exception) as e:
       self.reconnect(str(e))
-      return ""
+      return b""
 
   # --------------------------------------------------------------------
   # remove functions not implemented in pcl
@@ -134,9 +134,9 @@ class pcl(printer):
     print("File not found.")
     return c.NONEXISTENT
 
-  def retrieve_data(self, id):
-    str_send = '&f' + id + 'Y'  # set macro id
-    str_send += c.ESC + '&f2X'  # execute macro
+  def retrieve_data(self, id: bytes):
+    str_send = b'&f' + id + b'Y'  # set macro id
+    str_send += c.ESC + b'&f2X'  # execute macro
     return self.echo2data(self.cmd(str_send))
 
   # ------------------------[ put <local file> ]------------------------

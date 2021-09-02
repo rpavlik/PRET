@@ -303,7 +303,7 @@ class pjl(printer):
       self.do_info('brfirmware', '', False) # brother requires special treatment
 
   # ------------------------[ info <category> ]-------------------------
-  def do_info(self, arg, item='', echo=True):
+  def do_info(self, arg: str, item='', echo=True):
     if arg in self.options_info or not echo:
       str_recv = self.cmd('@PJL INFO ' + arg.upper()).rstrip()
       if item:
@@ -365,7 +365,7 @@ class pjl(printer):
   complete_set = complete_printenv
 
   # ------------------------[ set ]-------------------------------------
-  def do_set(self, arg, fb=True):
+  def do_set(self, arg: str, fb=True):
     "Set printer environment variable:  set <VAR=VALUE>"
     if not arg:
       arg = eval(input("Set variable (VAR=VALUE): "))

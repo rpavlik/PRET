@@ -388,7 +388,7 @@ class conn(object):
     self._sock.settimeout(*arg)
 
   # send data
-  def send(self, data):
+  def send(self, data: bytes):
     if self.debug: output().send(self.beautify(data), self.debug)
     # send data to device
     if self._file: return os.write(self._file, data)
