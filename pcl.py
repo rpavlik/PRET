@@ -11,15 +11,15 @@ from helper import log, output, conv, item, const as c
 class pcl(printer):
   # --------------------------------------------------------------------
   # send PCL command to printer, optionally receive response
-  def cmd(self, str_send, fb=True):
+  def cmd(self, bytes_send, fb=True):
     bytes_recv = b"" # response buffer
     token = bytes(random.randrange(2**8, 2**15) * -1) # -256..-32767
     footer = c.ESC + b'*s' + token + b'X' # echo delimiter
     # send command to printer device
     try:
-      cmd_send = c.UEL + c.PCL_HEADER + str_send + footer + c.UEL
+      cmd_send = c.UEL + c.PCL_HEADER + bytes_send + footer + c.UEL
       # write to logfile
-      log().write(self.logfile, c.ESC + str_send + os.linesep)
+      log().write(self.logfile, c.ESC + bytes_send + os.linesep)
       # sent to printer
       self.send(cmd_send)
       # use random token as delimiter for PCL responses
@@ -81,11 +81,11 @@ class pcl(printer):
   # get list of macro ids on printer device
   def idlist(self):
     list = []
-    str_send = b'*s4T'          # set location type (downloaded)
-    str_send += c.ESC + b'*s0U' # set location unit (all units)
-    str_send += c.ESC + b'*s1I' # set inquire entity (macros)
-    str_recv = self.cmd(str_send)
-    idlist = re.findall(b'IDLIST="(.*),?"', str_recv) ### maybe this can
+    bytes_send = b'*s4T'          # set location type (downloaded)
+    bytes_send += c.ESC + b'*s0U' # set location unit (all units)
+    bytes_send += c.ESC + b'*s1I' # set inquire entity (macros)
+    bytes_recv = self.cmd(bytes_send)
+    idlist = re.findall(b'IDLIST="(.*),?"', bytes_recv) ### maybe this can
     for id in item(idlist).split(","):               ### be packed into
       if id.startswith('1'): list.append(int(id))    ### a single regex
     return list
@@ -129,15 +129,15 @@ class pcl(printer):
     pclfs = self.dirlist()
     for name, (id, size, date) in list(pclfs.items()):
       if path == name:
-        str_recv = self.retrieve_data(id)
-        return (int(size), str_recv)
+        bytes_recv = self.retrieve_data(id)
+        return (int(size), bytes_recv)
     print("File not found.")
     return c.NONEXISTENT
 
   def retrieve_data(self, id: bytes):
-    str_send = b'&f' + id + b'Y'  # set macro id
-    str_send += c.ESC + b'&f2X'  # execute macro
-    return self.echo2data(self.cmd(str_send))
+    bytes_send = b'&f' + id + b'Y'  # set macro id
+    bytes_send += c.ESC + b'&f2X'  # execute macro
+    return self.echo2data(self.cmd(bytes_send))
 
   # ------------------------[ put <local file> ]------------------------
   def put(self, path, data):
@@ -156,24 +156,24 @@ class pcl(printer):
     pclfs[path] = [id, size, date]
     self.update_superblock(pclfs)
     # save data as pcl macro on printer
-    self.define_macro(id, data)
+    self.define_macro(id.encode(), data)
 
   # ====================================================================
 
   # define macro on printer device
-  def define_macro(self, id, data):
-    str_send = '&f' + id + 'Y'        # set macro id
-    str_send += c.ESC + '&f0X'        # start macro
-    str_send += self.data2echo(data)  # echo commands
-    str_send += c.ESC + '&f1X'        # end macro
-    str_send += c.ESC + '&f10X'       # make permanent
-    self.cmd(str_send, False)
+  def define_macro(self, id: bytes, data):
+    bytes_send = b'&f' + id + b'Y'        # set macro id
+    bytes_send += c.ESC + b'&f0X'        # start macro
+    bytes_send += self.data2echo(data)  # echo commands
+    bytes_send += c.ESC + b'&f1X'        # end macro
+    bytes_send += c.ESC + b'&f10X'       # make permanent
+    self.cmd(bytes_send, False)
 
   # delete macro from printer device
-  def delete_macro(self, id):
-    str_send = '&f' + id + 'Y'        # set macro id
-    str_send += c.ESC + '&f8X'        # delete macro
-    self.cmd(str_send, False)
+  def delete_macro(self, id: bytes):
+    bytes_send = b'&f' + id + b'Y'        # set macro id
+    bytes_send += c.ESC + b'&f8X'        # delete macro
+    self.cmd(bytes_send, False)
 
   # update information on virtual file system
   def update_superblock(self, pclfs):
@@ -182,18 +182,18 @@ class pcl(printer):
     self.define_macro(c.SUPERBLOCK, pclfs)
 
   # convert binary data to pcl echo commands
-  def data2echo(self, data):
-    echo = ''
+  def data2echo(self, data: bytes):
+    echo = b''
     for n in data:
-      echo += c.ESC + '*s' + str(ord(n)) + 'X'
+      echo += c.ESC + b'*s' + bytes(ord(bytes(n))) + b'X'
     return echo
 
   # convert pcl echo commands to binary data
-  def echo2data(self, echo):
-    data = ''
-    echo = re.findall("ECHO (\d+)", echo)
+  def echo2data(self, echo) -> bytes:
+    data = b''
+    echo = re.findall(rb"ECHO (\d+)", echo)
     for n in echo:
-      data += conv().chr(n)
+      data += conv().chr(bytes(n).decode()).encode()
     return data
 
   # ====================================================================
@@ -204,10 +204,10 @@ class pcl(printer):
       entity, desc = self.entities[arg]
       for location in self.locations:
         output().raw(desc + " " + self.locations[location])
-        str_send = '*s' + location + 'T'         # set location type
-        str_send += c.ESC + '*s0U'               # set location unit
-        str_send += c.ESC + '*s' + entity + 'I'  # set inquire entity
-        output().info(self.cmd(str_send))
+        bytes_send = b'*s' + location.encode() + b'T'         # set location type
+        bytes_send += c.ESC + b'*s0U'               # set location unit
+        bytes_send += c.ESC + b'*s' + entity.encode() + b'I'  # set inquire entity
+        output().info(self.cmd(bytes_send))
     else:
       self.help_info()
 

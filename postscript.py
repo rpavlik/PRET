@@ -3,7 +3,7 @@
 
 # python standard library
 import re, os, sys, string, random, json, collections
-from typing import List
+from typing import List, Tuple
 
 # local pret classes
 from printer import printer
@@ -99,8 +99,8 @@ class postscript(printer):
   # --------------------------------------------------------------------
   # check if remote volume exists
   def volumes(self) -> List[bytes]:
-    bytes_recv = self.cmd('/str 128 string def (*)'
-             + '{print (\\n) print} str devforall')
+    bytes_recv = self.cmd(b'/str 128 string def (*)'
+             + b'{print (\\n) print} str devforall')
     vols = bytes_recv.splitlines() + [b'%*%']
     return vols # return list of existing vols
 
@@ -120,8 +120,8 @@ class postscript(printer):
 
   # check if remote file exists
   def file_exists(self, path: bytes, ls=False):
-    bytes_recv = self.cmd('(' + path.decode() + ') status dup '
-             + '{pop == == == ==} if', False)
+    bytes_recv = self.cmd(b'(' + path + b') status dup '
+             + b'{pop == == == ==} if', False)
     meta = bytes_recv.splitlines()
     # standard conform ps interpreters respond with file size + timestamps
     if len(meta) == 4:
@@ -147,15 +147,15 @@ class postscript(printer):
     path = self.escape(path + self.get_sep(path))
     vol = b"" if self.vol else b"%*%" # search any volume if none specified
     # also lists hidden .dotfiles + special treatment for brother devices
-    str_recv = self.find(vol + path + b"**") or self.find(vol + path + b"*")
-    list = {name for name in str_recv.splitlines()}
+    bytes_recv = self.find(vol + path + b"**") or self.find(vol + path + b"*")
+    list = {name for name in bytes_recv.splitlines()}
     return sorted(list)
 
   def find(self, path: bytes) -> bytes:
-    str_send = '{false statusdict /setfilenameextend get exec} stopped\n'\
-               '/str 256 string def (' + path.decode() + ') '\
-               '{print (\\n) print} str filenameforall'
-    return self.timeoutcmd(str_send, self.timeout * 2, False)
+    bytes_send = b'{false statusdict /setfilenameextend get exec} stopped\n'\
+                 b'/str 256 string def (' + path + b') '\
+                 b'{print (\\n) print} str filenameforall'
+    return self.timeoutcmd(bytes_send, self.timeout * 2, False)
 
   # ------------------------[ ls <path> ]-------------------------------
   def do_ls(self, arg: str):
@@ -215,13 +215,13 @@ class postscript(printer):
       size = self.file_exists(path)
     if size != c.NONEXISTENT:
       # read file, one byte at a time
-      str_recv = self.cmd('/byte (0) def\n'
+      bytes_recv = self.cmd('/byte (0) def\n'
                         + '/infile (' + path.decode() + ') (r) file def\n'
                         + '{infile read {byte exch 0 exch put\n'
                         + '(%stdout) (w) file byte writestring}\n'
                         + '{infile closefile exit} ifelse\n'
                         + '} loop', True, True, True)
-      return (size, str_recv)
+      return (size, bytes_recv)
     else:
       print("File not found.")
       return c.NONEXISTENT
@@ -241,9 +241,9 @@ class postscript(printer):
     self.put(path, data, 'a+')
 
   # ------------------------[ delete <file> ]---------------------------
-  def delete(self, arg):
+  def delete(self, arg: bytes):
     path = self.rpath(arg)
-    self.cmd('(' + path.decode() + ') deletefile', False)
+    self.cmd(b'(' + path + b') deletefile', False)
 
   # ------------------------[ rename <old> <new> ]----------------------
   def do_rename(self, arg: str):
@@ -251,7 +251,7 @@ class postscript(printer):
     if len(args) > 1:
       old = self.rpath(args[0].encode())
       new = self.rpath(args[1].encode())
-      self.cmd('(' + old.decode() + ') (' + new.decode() + ') renamefile', False)
+      self.cmd(b'(' + old + b') (' + new + b') renamefile', False)
     else:
       self.onecmd("help rename")
 
@@ -265,28 +265,28 @@ class postscript(printer):
   # ------------------------[ id ]--------------------------------------
   def do_id(self, *arg):
     "Show device information."
-    output().info(self.cmd('product print').decode())
+    output().info(self.cmd(b'product print').decode())
 
   # ------------------------[ version ]---------------------------------
   def do_version(self, *arg):
     "Show PostScript interpreter version."
-    str_send = '(Dialect:  ) print\n'\
-      'currentpagedevice dup (PostRenderingEnhance) known {(Adobe\\n)   print}\n'\
-      '{serverdict       dup (execkpdlbatch)        known {(KPDL\\n)    print}\n'\
-      '{statusdict       dup (BRversion)            known {(BR-Script ) print\n'\
-      '/BRversion get ==}{(Unknown) print} ifelse} ifelse} ifelse\n'\
-      'currentsystemparams 11 {dup} repeat\n'\
-      '                     (Version:  ) print version           ==\n'\
-      '                     (Level:    ) print languagelevel     ==\n'\
-      '                     (Revision: ) print revision          ==\n'\
-      '                     (Serial:   ) print serialnumber      ==\n'\
-      '/SerialNumber known {(Number:   ) print /SerialNumber get ==} if\n'\
-      '/BuildTime    known {(Built:    ) print /BuildTime    get ==} if\n'\
-      '/PrinterName  known {(Printer:  ) print /PrinterName  get ==} if\n'\
-      '/LicenseID    known {(License:  ) print /LicenseID    get ==} if\n'\
-      '/PrinterCode  known {(Device:   ) print /PrinterCode  get ==} if\n'\
-      '/EngineCode   known {(Engine:   ) print /EngineCode   get ==} if'
-    output().info(self.cmd(str_send))
+    bytes_send = b'(Dialect:  ) print\n'\
+      b'currentpagedevice dup (PostRenderingEnhance) known {(Adobe\\n)   print}\n'\
+      b'{serverdict       dup (execkpdlbatch)        known {(KPDL\\n)    print}\n'\
+      b'{statusdict       dup (BRversion)            known {(BR-Script ) print\n'\
+      b'/BRversion get ==}{(Unknown) print} ifelse} ifelse} ifelse\n'\
+      b'currentsystemparams 11 {dup} repeat\n'\
+      b'                     (Version:  ) print version           ==\n'\
+      b'                     (Level:    ) print languagelevel     ==\n'\
+      b'                     (Revision: ) print revision          ==\n'\
+      b'                     (Serial:   ) print serialnumber      ==\n'\
+      b'/SerialNumber known {(Number:   ) print /SerialNumber get ==} if\n'\
+      b'/BuildTime    known {(Built:    ) print /BuildTime    get ==} if\n'\
+      b'/PrinterName  known {(Printer:  ) print /PrinterName  get ==} if\n'\
+      b'/LicenseID    known {(License:  ) print /LicenseID    get ==} if\n'\
+      b'/PrinterCode  known {(Device:   ) print /PrinterCode  get ==} if\n'\
+      b'/EngineCode   known {(Engine:   ) print /EngineCode   get ==} if'
+    output().info(self.cmd(bytes_send))
 
   # ------------------------[ df ]--------------------------------------
   def do_df(self, arg: str):
@@ -294,9 +294,9 @@ class postscript(printer):
     output().df(('VOLUME', 'TOTAL SIZE', 'FREE SPACE', 'PRIORITY',
     'REMOVABLE', 'MOUNTED', 'HASNAMES', 'WRITEABLE', 'SEARCHABLE'))
     for vol in self.volumes():
-      str_send = '(' + vol.decode() + ') devstatus dup {pop ' + '== ' * 8 + '} if'
-      lst_recv = self.cmd(str_send).splitlines()
-      values = (vol,) + tuple(lst_recv if len(lst_recv) == 8 else ['-'] * 8)
+      bytes_send = b'(' + vol + b') devstatus dup {pop ' + b'== ' * 8 + b'} if'
+      lst_recv = self.cmd(bytes_send).decode().splitlines()
+      values = (vol.decode(),) + tuple(lst_recv if len(lst_recv) == 8 else ['-'] * 8)
       output().df(values)
 
   # ------------------------[ free ]------------------------------------
@@ -304,74 +304,74 @@ class postscript(printer):
     "Show available memory."
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     output().raw("RAM status")
-    output().info(self.cmd('currentsystemparams dup dup dup\n'
-                         + '/mb 1048576 def /kb 100 def /str 32 string def\n'
-                         + '(size:   ) print /InstalledRam known {\n'
-                         + '  /InstalledRam get dup mb div cvi str cvs print (.) print kb mod cvi str cvs print (M\\n) print}{pop (Not available\\n) print\n'
-                         + '} ifelse\n'
-                         + '(free:   ) print /RamSize known {\n'
-                         + '  /RamSize get dup mb div cvi str cvs print (.) print kb mod cvi str cvs print (M\\n) print}{pop (Not available\\n) print\n'
-                         + '} ifelse'))
+    output().info(self.cmd(b'currentsystemparams dup dup dup\n'
+                         + b'/mb 1048576 def /kb 100 def /str 32 string def\n'
+                         + b'(size:   ) print /InstalledRam known {\n'
+                         + b'  /InstalledRam get dup mb div cvi str cvs print (.) print kb mod cvi str cvs print (M\\n) print}{pop (Not available\\n) print\n'
+                         + b'} ifelse\n'
+                         + b'(free:   ) print /RamSize known {\n'
+                         + b'  /RamSize get dup mb div cvi str cvs print (.) print kb mod cvi str cvs print (M\\n) print}{pop (Not available\\n) print\n'
+                         + b'} ifelse'))
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     output().raw("Virtual memory")
-    output().info(self.cmd('vmstatus\n'
-                         + '/mb 1048576 def /kb 100 def /str 32 string def\n'
-                         + '(max:    ) print dup mb div cvi str cvs print (.) print kb mod cvi str cvs print (M\\n) print\n'
-                         + '(used:   ) print dup mb div cvi str cvs print (.) print kb mod cvi str cvs print (M\\n) print\n'
-                         + '(level:  ) print =='))
+    output().info(self.cmd(b'vmstatus\n'
+                         + b'/mb 1048576 def /kb 100 def /str 32 string def\n'
+                         + b'(max:    ) print dup mb div cvi str cvs print (.) print kb mod cvi str cvs print (M\\n) print\n'
+                         + b'(used:   ) print dup mb div cvi str cvs print (.) print kb mod cvi str cvs print (M\\n) print\n'
+                         + b'(level:  ) print =='))
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     output().raw("Font cache")
-    output().info(self.cmd('cachestatus\n'
-                         + '/mb 1048576 def /kb 100 def /str 32 string def\n'
-                         + '(blimit: ) print ==\n'
-                         + '(cmax:   ) print ==\n'
-                         + '(csize:  ) print ==\n'
-                         + '(mmax:   ) print ==\n'
-                         + '(msize:  ) print ==\n'
-                         + '(bmax:   ) print ==\n'
-                         + '(bsize:  ) print =='))
+    output().info(self.cmd(b'cachestatus\n'
+                         + b'/mb 1048576 def /kb 100 def /str 32 string def\n'
+                         + b'(blimit: ) print ==\n'
+                         + b'(cmax:   ) print ==\n'
+                         + b'(csize:  ) print ==\n'
+                         + b'(mmax:   ) print ==\n'
+                         + b'(msize:  ) print ==\n'
+                         + b'(bmax:   ) print ==\n'
+                         + b'(bsize:  ) print =='))
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     output().raw("User cache")
-    output().info(self.cmd('ucachestatus\n'
-                         + '/mb 1048576 def /kb 100 def /str 32 string def\n'
-                         + '(blimit: ) print ==\n'
-                         + '(rmax:   ) print ==\n'
-                         + '(rsize:  ) print ==\n'
-                         + '(bmax:   ) print ==\n'
-                         + '(bsize:  ) print =='))
+    output().info(self.cmd(b'ucachestatus\n'
+                         + b'/mb 1048576 def /kb 100 def /str 32 string def\n'
+                         + b'(blimit: ) print ==\n'
+                         + b'(rmax:   ) print ==\n'
+                         + b'(rsize:  ) print ==\n'
+                         + b'(bmax:   ) print ==\n'
+                         + b'(bsize:  ) print =='))
 
   # ------------------------[ devices ]---------------------------------
   def do_devices(self, arg: str):
     "Show available I/O devices."
-    str_send = '/str 128 string def (*) {print (\\n) print} str /IODevice resourceforall'
-    for dev in self.cmd(str_send).splitlines():
+    bytes_send = b'/str 128 string def (*) {print (\\n) print} str /IODevice resourceforall'
+    for dev in self.cmd(bytes_send).splitlines():
       output().info(dev)
-      output().raw(self.cmd('(' + dev.decode() + ') currentdevparams {exch 128 string '
-                          + 'cvs print (: ) print ==} forall').decode() + os.linesep)
+      output().raw(self.cmd(b'(' + dev + b') currentdevparams {exch 128 string '
+                          + b'cvs print (: ) print ==} forall').decode() + os.linesep)
 
   # ------------------------[ uptime ]----------------------------------
   def do_uptime(self, arg: str):
     "Show system uptime (might be random)."
-    str_recv = self.cmd('realtime ==')
-    try: output().info(conv().elapsed(str_recv, 1000))
+    bytes_recv = self.cmd(b'realtime ==')
+    try: output().info(conv().elapsed(bytes_recv, 1000))
     except ValueError: output().info("Not available")
 
   # ------------------------[ date ]------------------------------------
   def do_date(self, arg: str):
     "Show printer's system date and time."
-    str_send = '(%Calendar%) /IODevice resourcestatus\n'\
-               '{(%Calendar%) currentdevparams /DateTime get print}\n'\
-               '{(Not available) print} ifelse'
-    str_recv = self.cmd(str_send)
-    output().info(str_recv)
+    bytes_send = b'(%Calendar%) /IODevice resourcestatus\n'\
+                 b'{(%Calendar%) currentdevparams /DateTime get print}\n'\
+                 b'{(Not available) print} ifelse'
+    bytes_recv = self.cmd(bytes_send)
+    output().info(bytes_recv)
 
   # ------------------------[ pagecount ]-------------------------------
   def do_pagecount(self, arg: str):
     "Show printer's page counter:  pagecount <number>"
     output().raw("Hardware page counter: ", '')
-    str_send = 'currentsystemparams dup /PageCount known\n'\
-               '{/PageCount get ==}{(Not available) print} ifelse'
-    output().info(self.cmd(str_send))
+    bytes_send = b'currentsystemparams dup /PageCount known\n'\
+                 b'{/PageCount get ==}{(Not available) print} ifelse'
+    output().info(self.cmd(bytes_send))
 
   # ====================================================================
 
@@ -380,10 +380,11 @@ class postscript(printer):
     "Set startjob and system parameters password."
     if not arg:
       arg = eval(input("Enter password: "))
-    self.cmd('<< /Password () '
-             '/SystemParamsPassword (' + arg + ') ' # harmless settings
-             '/StartJobPassword (' + arg + ') '     # alter initial vm!
-             '>> setsystemparams', False)
+    a = arg.encode()
+    self.cmd(b'<< /Password () '
+             b'/SystemParamsPassword (' + a + b') ' # harmless settings
+             b'/StartJobPassword (' + a + b') '     # alter initial vm!
+             b'>> setsystemparams', False)
 
   # ------------------------[ unlock <passwd>|"bypass" ]----------------
   def do_unlock(self, arg: str):
@@ -400,23 +401,23 @@ class postscript(printer):
     if not arg:
       print("No password given, cracking.") # 140k tries/sec on lj4250!
       output().chitchat("If this ain't successful, try 'unlock bypass'")
-      arg = self.timeoutcmd('/min 0 def /max ' + str(max) + ' def\n'
-              'statusdict begin {min 1 max\n'
-              '  {dup checkpassword {== flush stop}{pop} ifelse} for\n'
-              '} stopped pop', self.timeout * 100)
+      arg = self.timeoutcmd(b'/min 0 def /max ' + str(max).encode() + b' def\n'
+              b'statusdict begin {min 1 max\n'
+              b'  {dup checkpassword {== flush stop}{pop} ifelse} for\n'
+              b'} stopped pop', self.timeout * 100)
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # superexec can be used to reset PostScript passwords on most devices
     elif arg == 'bypass':
       print("Resetting password to zero with super-secret PostScript magic")
-      self.supercmd('<< /SystemParamsPassword (0)'
-      ' /StartJobPassword (0) >> setsystemparams')
+      self.supercmd(b'<< /SystemParamsPassword (0)'
+                    b' /StartJobPassword (0) >> setsystemparams')
       arg = '0' # assume we have successfully reset the passwords to zero
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # finally unlock device with user-supplied or cracked password
-    bytes_recv = self.cmd('{ << /Password (' + arg + ')\n'
-                        '  /SystemParamsPassword ()\n' # mostly harmless
-                        '  /StartJobPassword ()\n' # permanent VM change
-                        '  >> setsystemparams\n} stopped ==')
+    bytes_recv = self.cmd(b'{ << /Password (' + arg.encode() + b')\n'
+                          b'  /SystemParamsPassword ()\n' # mostly harmless
+                          b'  /StartJobPassword ()\n' # permanent VM change
+                          b'  >> setsystemparams\n} stopped ==')
     msg = "Use the 'reset' command to restore factory defaults"
     if not b'false' in bytes_recv: output().errmsg("Cannot unlock", msg)
     else: output().raw("Device unlocked with password: " + arg)
@@ -426,7 +427,7 @@ class postscript(printer):
     "Restart PostScript interpreter."
     output().chitchat("Restarting PostScript interpreter.")
     # reset VM, might delete downloaded files and/or restart printer
-    self.globalcmd('systemdict /quit get exec')
+    self.globalcmd(b'systemdict /quit get exec')
 
   # ------------------------[ reset ]-----------------------------------
   def do_reset(self, arg: str):
@@ -439,7 +440,7 @@ class postscript(printer):
     sets FactoryDefaults to true is not the last job executed straight before
     power-off, the request is ignored; this reduces the chance that malicious
     jobs will attempt to perform this operation.« '''
-    self.cmd('<< /FactoryDefaults true >> setsystemparams', False)
+    self.cmd(b'<< /FactoryDefaults true >> setsystemparams', False)
     output().raw("Printer must be turned off immediately for changes to take effect.")
     output().raw("This can be accomplished, using the 'restart' command in PJL mode.")
 
@@ -452,15 +453,15 @@ class postscript(printer):
       output().warning("Warning: Initializing the printer's file system will whipe-out all")
       output().warning("user data (e.g. stored jobs) on the volume. Press CTRL+C to abort.")
       if output().countdown("Initializing " + self.vol.decode() + " in...", 10, self):
-        str_recv = self.cmd('statusdict begin (' + self.vol.decode() + ') () initializedisk end', False)
+        bytes_recv = self.cmd(b'statusdict begin (' + self.vol + b') () initializedisk end', False)
 
   # ------------------------[ disable ]---------------------------------
   def do_disable(self, arg: str):
     output().psonly()
-    before = b'true' in self.globalcmd('userdict /showpage known dup ==\n'
-                                      '{userdict /showpage undef}\n'
-                                      '{/showpage {} def} ifelse')
-    after = b'true' in self.cmd('userdict /showpage known ==')
+    before = b'true' in self.globalcmd(b'userdict /showpage known dup ==\n'
+                                       b'{userdict /showpage undef}\n'
+                                       b'{/showpage {} def} ifelse')
+    after = b'true' in self.cmd(b'userdict /showpage known ==')
     if before == after: output().info("Not available") # no change
     elif before: output().info("Printing is now enabled")
     elif after: output().info("Printing is now disabled")
@@ -489,15 +490,15 @@ class postscript(printer):
       │ reboot. Else we should use the /StartJobPassword instead. │
       └───────────────────────────────────────────────────────────┘
       '''
-      cycles = '100' # number of nvram write cycles per loop
+      cycles = b'100' # number of nvram write cycles per loop
                      # large values kill old printers faster
       for n in range(1, 1000000):
-        self.globalcmd('/value {currentsystemparams /WaitTimeout get} def\n'
-                       '/count 0 def /new {count 2 mod 30 add} def\n'
-                       '{ << /WaitTimeout new >> setsystemparams\n'
-                       '  /count count 1 add def % increment\n'
-                       '  value count ' + cycles + ' eq {exit} if\n'
-                       '} loop', False)
+        self.globalcmd(b'/value {currentsystemparams /WaitTimeout get} def\n'
+                       b'/count 0 def /new {count 2 mod 30 add} def\n'
+                       b'{ << /WaitTimeout new >> setsystemparams\n'
+                       b'  /count count 1 add def % increment\n'
+                       b'  value count ' + cycles + b' eq {exit} if\n'
+                       b'} loop', False)
         self.chitchat("\rNVRAM write cycles: " + str(n*int(cycles)), '')
       print() # echo newline if we get this far
 
@@ -507,7 +508,7 @@ class postscript(printer):
     output().warning("Warning: This command causes an infinite loop rendering the")
     output().warning("device useless until manual restart. Press CTRL+C to abort.")
     if output().countdown("Executing PostScript infinite loop in...", 10, self):
-      self.cmd('{} loop', False)
+      self.cmd(b'{} loop', False)
 
   # ====================================================================
 
@@ -528,15 +529,15 @@ class postscript(printer):
     output().psonly()
     size = str(conv().filesize(len(data))).strip()
     self.chitchat("Injecting overlay data (" + size + ") into printer memory")
-    str_send = '{overlay closefile} stopped % free memory\n'\
-               '/overlay systemdict /currentfile get exec\n'\
-               + str(len(data)) + ' () /SubFileDecode filter\n'\
-               '/ReusableStreamDecode filter\n' + data + '\n'\
-               'def % --------------------------------------\n'\
-               '/showpage {save /showpage {} def overlay dup\n'\
-               '0 setfileposition cvx exec restore systemdict\n'\
-               '/showpage get exec} def'
-    self.globalcmd(str_send)
+    bytes_send = b'{overlay closefile} stopped % free memory\n' \
+                 b'/overlay systemdict /currentfile get exec\n' \
+                 + str(len(data)).encode() + b' () /SubFileDecode filter\n' \
+                 b'/ReusableStreamDecode filter\n' + data + b'\n' \
+                 b'def % --------------------------------------\n' \
+                 b'/showpage {save /showpage {} def overlay dup\n' \
+                 b'0 setfileposition cvx exec restore systemdict\n' \
+                 b'/showpage get exec} def'
+    self.globalcmd(bytes_send)
 
   # ------------------------[ cross <text> <font> ]---------------------
   def do_cross(self, arg: str):
@@ -573,27 +574,27 @@ class postscript(printer):
     args = re.split(r"\s+", arg, 1)
     if len(args) > 1:
       output().psonly()
-      oldstr, newstr = self.escape(args[0].encode()).decode(), self.escape(args[1].encode()).decode()
-      self.globalcmd('/strcat {exch dup length 2 index length add string dup\n'
-                      'dup 4 2 roll copy length 4 -1 roll putinterval} def\n'
-                      '/replace {exch pop (' + newstr + ') exch 3 1 roll exch strcat strcat} def\n'
-                      '/findall {{(' + oldstr + ') search {replace}{exit} ifelse} loop} def\n'
-                      '/show       {      findall       systemdict /show       get exec} def\n'
-                      '/ashow      {      findall       systemdict /ashow      get exec} def\n'
-                      '/widthshow  {      findall       systemdict /widthshow  get exec} def\n'
-                      '/awidthshow {      findall       systemdict /awidthshow get exec} def\n'
-                      '/cshow      {      findall       systemdict /cshow      get exec} def\n'
-                      '/kshow      {      findall       systemdict /kshow      get exec} def\n'
-                      '/xshow      { exch findall exch  systemdict /xshow      get exec} def\n'
-                      '/xyshow     { exch findall exch  systemdict /xyshow     get exec} def\n'
-                      '/yshow      { exch findall exch  systemdict /yshow      get exec} def\n')
+      oldstr, newstr = self.escape(args[0].encode()), self.escape(args[1].encode())
+      self.globalcmd(b'/strcat {exch dup length 2 index length add string dup\n'
+                     b'dup 4 2 roll copy length 4 -1 roll putinterval} def\n'
+                     b'/replace {exch pop (' + newstr + b') exch 3 1 roll exch strcat strcat} def\n'
+                     b'/findall {{(' + oldstr + b') search {replace}{exit} ifelse} loop} def\n'
+                     b'/show       {      findall       systemdict /show       get exec} def\n'
+                     b'/ashow      {      findall       systemdict /ashow      get exec} def\n'
+                     b'/widthshow  {      findall       systemdict /widthshow  get exec} def\n'
+                     b'/awidthshow {      findall       systemdict /awidthshow get exec} def\n'
+                     b'/cshow      {      findall       systemdict /cshow      get exec} def\n'
+                     b'/kshow      {      findall       systemdict /kshow      get exec} def\n'
+                     b'/xshow      { exch findall exch  systemdict /xshow      get exec} def\n'
+                     b'/xyshow     { exch findall exch  systemdict /xyshow     get exec} def\n'
+                     b'/yshow      { exch findall exch  systemdict /yshow      get exec} def\n')
     else:
       self.onecmd("help replace")
 
   # ------------------------[ capture <operation> ]---------------------
   def do_capture(self, arg: str):
     "Capture further jobs to be printed on this device."
-    free = '5' # memory limit in megabytes that must at least be free to capture print jobs
+    free = b'5' # memory limit in megabytes that must at least be free to capture print jobs
     # record future print jobs
     if arg.startswith('start'):
       output().psonly()
@@ -615,62 +616,62 @@ class postscript(printer):
       │ execute: │   ✔   │   ✔   │   ✔   │   -   │   ✔   │   ✔   │
       └──────────┴───────┴───────┴───────┴───────┴───────┴───────┘
       '''
-      str_send = 'true 0 startjob {                                                     \n'\
-                 '/setoldtime {/oldtime realtime def} def setoldtime                    \n'\
-                 '/threshold {realtime oldtime sub abs 10000 lt} def                    \n'\
-                 '/free {vmstatus exch pop exch pop 1048576 div '+free+' ge} def        \n'\
-                 '%---------------------------------------------------------------------\n'\
-                 '%--------------[ get current document as file object ]----------------\n'\
-                 '%---------------------------------------------------------------------\n'\
-                 '/document {(%stdin) (r) file /ReusableStreamDecode filter} bind def   \n'\
-                 '%---------------------------------------------------------------------\n'\
-                 '/capturehook {{                                                       \n'\
-                 '  threshold {(Within threshold - will not capture\\n) print flush     \n'\
-                 '  setoldtime                                                          \n'\
-                 '}{                                                                    \n'\
-                 '  setoldtime                                                          \n'\
-                 '  free not {(Out of memory\\n) print flush}{                          \n'\
-                 '  % (This job will be captured in memory\\n) print flush              \n'\
-                 '  setoldtime                                                          \n'\
-                 '  false echo                            % stop interpreter slowdown   \n'\
-                 '  /timestamp realtime def               % get time from interpreter   \n'\
-                 '  userdict /capturedict known not       % print jobs are saved here   \n'\
-                 '  {/capturedict 50000 dict def} if      % define capture dictionary   \n'\
-                 '  %-------------------------------------------------------------------\n'\
-                 '  %--------------[ save document to dict and print it ]---------------\n'\
-                 '  %-------------------------------------------------------------------\n'\
-                 '  capturedict timestamp document put    % store document in memory    \n'\
-                 '  capturedict timestamp get cvx exec    % print the actual document   \n'\
-                 '  clear cleardictstack                  % restore original vm state   \n'\
-                 '  %-------------------------------------------------------------------\n'\
-                 '  setoldtime                                                          \n'\
-                 '  } ifelse} ifelse} stopped} bind def                                 \n'\
-                 '<< /BeginPage {capturehook} bind >> setpagedevice                     \n'\
-                 '(Future print jobs will be captured in memory!)}                      \n'\
-                 '{(Cannot capture - unlock me first)} ifelse print'
-      output().raw(self.cmd(str_send))
+      bytes_send = b'true 0 startjob {                                                     \n'\
+                   b'/setoldtime {/oldtime realtime def} def setoldtime                    \n'\
+                   b'/threshold {realtime oldtime sub abs 10000 lt} def                    \n'\
+                   b'/free {vmstatus exch pop exch pop 1048576 div '+free+b' ge} def       \n'\
+                   b'%---------------------------------------------------------------------\n'\
+                   b'%--------------[ get current document as file object ]----------------\n'\
+                   b'%---------------------------------------------------------------------\n'\
+                   b'/document {(%stdin) (r) file /ReusableStreamDecode filter} bind def   \n'\
+                   b'%---------------------------------------------------------------------\n'\
+                   b'/capturehook {{                                                       \n'\
+                   b'  threshold {(Within threshold - will not capture\\n) print flush     \n'\
+                   b'  setoldtime                                                          \n'\
+                   b'}{                                                                    \n'\
+                   b'  setoldtime                                                          \n'\
+                   b'  free not {(Out of memory\\n) print flush}{                          \n'\
+                   b'  % (This job will be captured in memory\\n) print flush              \n'\
+                   b'  setoldtime                                                          \n'\
+                   b'  false echo                            % stop interpreter slowdown   \n'\
+                   b'  /timestamp realtime def               % get time from interpreter   \n'\
+                   b'  userdict /capturedict known not       % print jobs are saved here   \n'\
+                   b'  {/capturedict 50000 dict def} if      % define capture dictionary   \n'\
+                   b'  %-------------------------------------------------------------------\n'\
+                   b'  %--------------[ save document to dict and print it ]---------------\n'\
+                   b'  %-------------------------------------------------------------------\n'\
+                   b'  capturedict timestamp document put    % store document in memory    \n'\
+                   b'  capturedict timestamp get cvx exec    % print the actual document   \n'\
+                   b'  clear cleardictstack                  % restore original vm state   \n'\
+                   b'  %-------------------------------------------------------------------\n'\
+                   b'  setoldtime                                                          \n'\
+                   b'  } ifelse} ifelse} stopped} bind def                                 \n'\
+                   b'<< /BeginPage {capturehook} bind >> setpagedevice                     \n'\
+                   b'(Future print jobs will be captured in memory!)}                      \n'\
+                   b'{(Cannot capture - unlock me first)} ifelse print'
+      output().raw(self.cmd(bytes_send))
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # show captured print jobs
     elif arg.startswith('list'):
       # show amount of free virtual memory left to capture print jobs
-      vmem = self.cmd('vmstatus exch pop exch pop 32 string cvs print')
+      vmem = self.cmd(b'vmstatus exch pop exch pop 32 string cvs print')
       output().chitchat("Free virtual memory: " + str(conv().filesize(vmem))
         + " | Limit to capture: " + str(conv().filesize(int(free) * 1048576)))
-      output().warning(self.cmd('userdict /free known {free not\n'
-        '{(Memory almost full, will not capture jobs anymore) print} if}\n'
-        '{(Capturing print jobs is currently not active) print} ifelse'))
+      output().warning(self.cmd(b'userdict /free known {free not\n'
+        b'{(Memory almost full, will not capture jobs anymore) print} if}\n'
+        b'{(Capturing print jobs is currently not active) print} ifelse'))
       # get first 100 lines for each captured job
-      str_recv = self.cmd(
-        'userdict /capturedict known {capturedict\n'
-        '{ exch realtime sub (Date: ) print == dup          % get time diff\n'
-        '  resetfile (Size: ) print dup bytesavailable ==   % get file size\n'
-        '  100 {dup 128 string readline {(%%) anchorsearch  % get metadata\n'
-        '  {exch print (\\n) print} if pop}{pop exit} ifelse} repeat pop\n'
-        '  (' + c.DELIMITER.decode() + '\\n) print\n'
-        '} forall clear} if')
+      bytes_recv = self.cmd(
+        b'userdict /capturedict known {capturedict\n'
+        b'{ exch realtime sub (Date: ) print == dup          % get time diff\n'
+        b'  resetfile (Size: ) print dup bytesavailable ==   % get file size\n'
+        b'  100 {dup 128 string readline {(%%) anchorsearch  % get metadata\n'
+        b'  {exch print (\\n) print} if pop}{pop exit} ifelse} repeat pop\n'
+        b'  (' + c.DELIMITER + b'\\n) print\n'
+        b'} forall clear} if')
       # grep for metadata in captured jobs
       jobs = []
-      for val in [_f for _f in str_recv.split(c.DELIMITER) if _f]:
+      for val in [_f for _f in bytes_recv.split(c.DELIMITER) if _f]:
         date = conv().timediff(item(re.findall(b'Date: (.*)', val)))
         size = conv().filesize(item(re.findall(b'Size: (.*)', val)))
         user = item(re.findall(b'For: (.*)', val))
@@ -685,7 +686,7 @@ class postscript(printer):
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # save captured print jobs
     elif arg.startswith('fetch'):
-      jobs = self.cmd('userdict /capturedict known {capturedict {exch ==} forall} if').splitlines()
+      jobs = self.cmd(b'userdict /capturedict known {capturedict {exch ==} forall} if').splitlines()
       if not jobs: output().raw("No jobs captured")
       else:
         for job in jobs:
@@ -697,11 +698,11 @@ class postscript(printer):
           # download captured job
           output().raw("Receiving " + lpath)
           data = b'%!\n'
-          data += self.cmd('/byte (0) def\n'
-            'capturedict ' + job + ' get dup resetfile\n'
-            '{dup read {byte exch 0 exch put\n'
-            '(%stdout) (w) file byte writestring}\n'
-            '{exit} ifelse} loop')
+          data += self.cmd(b'/byte (0) def\n'
+            b'capturedict ' + job + b' get dup resetfile\n'
+            b'{dup read {byte exch 0 exch put\n'
+            b'(%stdout) (w) file byte writestring}\n'
+            b'{exit} ifelse} loop')
           data = conv().nstrip_bytes(data) # remove carriage return chars
           print((str(len(data)) + " bytes received."))
           # write to local file
@@ -716,19 +717,19 @@ class postscript(printer):
     # reprint saved print jobs
     elif arg.endswith('print'):
       output().raw(self.cmd(
-       '/str 256 string def /count 0 def\n'
-       '/increment {/count 1 count add def} def\n'
-       '/msg {(Reprinting recorded job ) print count str\n'
-       'cvs print ( of ) print total str cvs print (\\n) print} def\n'
-       'userdict /capturedict known {/total capturedict length def\n'
-       'capturedict {increment msg dup resetfile cvx exec} forall} if\n'
-       'count 0 eq {(No jobs captured) print} if'))
+       b'/str 256 string def /count 0 def\n'
+       b'/increment {/count 1 count add def} def\n'
+       b'/msg {(Reprinting recorded job ) print count str\n'
+       b'cvs print ( of ) print total str cvs print (\\n) print} def\n'
+       b'userdict /capturedict known {/total capturedict length def\n'
+       b'capturedict {increment msg dup resetfile cvx exec} forall} if\n'
+       b'count 0 eq {(No jobs captured) print} if'))
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # end capturing print jobs
     elif arg.startswith('stop'):
       output().raw("Stopping job capture, deleting recorded jobs")
-      self.globalcmd('<< /BeginPage {} bind /EndPage {} bind >>\n'
-                     'setpagedevice userdict /capturedict undef\n')
+      self.globalcmd(b'<< /BeginPage {} bind /EndPage {} bind >>\n'
+                     b'setpagedevice userdict /capturedict undef\n')
     else:
       self.help_capture()
 
@@ -748,14 +749,14 @@ class postscript(printer):
   def do_hold(self, arg: str):
     "Enable job retention."
     output().psonly()
-    str_send = 'currentpagedevice (CollateDetails) get (Hold) get 1 ne\n'\
-               '{/retention 1 def}{/retention 0 def} ifelse\n'\
-               '<< /Collate true /CollateDetails\n'\
-               '<< /Hold retention /Type 8 >> >> setpagedevice\n'\
-               '(Job retention ) print\n'\
-               'currentpagedevice (CollateDetails) get (Hold) get 1 ne\n'\
-               '{(disabled.) print}{(enabled.) print} ifelse'
-    output().info(self.globalcmd(str_send))
+    bytes_send = b'currentpagedevice (CollateDetails) get (Hold) get 1 ne\n'\
+                 b'{/retention 1 def}{/retention 0 def} ifelse\n'\
+                 b'<< /Collate true /CollateDetails\n'\
+                 b'<< /Hold retention /Type 8 >> >> setpagedevice\n'\
+                 b'(Job retention ) print\n'\
+                 b'currentpagedevice (CollateDetails) get (Hold) get 1 ne\n'\
+                 b'{(disabled.) print}{(enabled.) print} ifelse'
+    output().info(self.globalcmd(bytes_send))
     self.chitchat("On most devices, jobs can only be reprinted by a local attacker via the")
     self.chitchat("printer's control panel. Stored jobs are sometimes accessible by PS/PJL")
     self.chitchat("file system access or via the embedded web server. If your printer does")
@@ -822,16 +823,16 @@ class postscript(printer):
     # ask interpreter if functions are known to systemdict
     for desc, funcs in sorted(functionlist.items()):
       output().chitchat(desc)
-      commands = ['(' + func  + ': ) print systemdict /'
-               + func + ' known ==' for func in funcs]
-      bytes_recv = self.cmd(c.EOL.decode().join(commands), False)
+      commands = [b'(' + func.encode()  + b': ) print systemdict /'
+                  + func.encode() + b' known ==' for func in funcs]
+      bytes_recv = self.cmd(c.EOL.join(commands), False)
       for line in bytes_recv.splitlines():
         output().green(line) if b" true" in line else output().warning(line)
 
   # ------------------------[ search <key> ]----------------------------
   def do_search(self, arg: str):
     "Search all dictionaries by key:  search <key>"
-    output().info(self.cmd('(' + arg + ') where {(' + arg + ') get ==} if'))
+    output().info(self.cmd(b'(' + arg.encode() + b') where {(' + arg.encode() + b') get ==} if'))
 
   # ------------------------[ dicts ]-----------------------------------
   def do_dicts(self, arg: str):
@@ -839,14 +840,14 @@ class postscript(printer):
     output().info("acl   len   max   dictionary")
     output().info("────────────────────────────")
     for dict in self.options_dump:
-      str_recv = self.cmd('1183615869 ' + dict + '\n'
-                          'dup rcheck {(r) print}{(-) print} ifelse\n'
-                          'dup wcheck {(w) print}{(-) print} ifelse\n'
-                          'dup xcheck {(x) print}{(-) print} ifelse\n'
-                          '( ) print dup length 128 string cvs print\n'
-                          '( ) print maxlength  128 string cvs print')
-      if len(str_recv.split()) == 3:
-        output().info("%-5s %-5s %-5s %s" % tuple(str_recv.split() + [dict.encode()]))
+      bytes_recv = self.cmd(b'1183615869 ' + dict + b'\n'
+                            b'dup rcheck {(r) print}{(-) print} ifelse\n'
+                            b'dup wcheck {(w) print}{(-) print} ifelse\n'
+                            b'dup xcheck {(x) print}{(-) print} ifelse\n'
+                            b'( ) print dup length 128 string cvs print\n'
+                            b'( ) print maxlength  128 string cvs print')
+      if len(bytes_recv.split()) == 3:
+        output().info("%-5s %-5s %-5s %s" % tuple(bytes_recv.split() + [dict]))
 
   # ------------------------[ dump <dict> ]-----------------------------
   def do_dump(self, arg: str, resource=False):
@@ -860,12 +861,12 @@ class postscript(printer):
     print("Standard PostScript dictionaries:")
     last = None
     if len(self.options_dump) > 0: last = self.options_dump[-1]
-    for dict in self.options_dump: print((('└─ ' if dict == last else '├─ ') + dict))
+    for dict in self.options_dump: print((('└─ ' if dict == last else '├─ ') + dict.decode()))
 
   # undocumented ... what about proprietary dictionary names?
-  options_dump = ('systemdict', 'statusdict', 'userdict', 'globaldict',
-        'serverdict', 'errordict', 'internaldict', 'currentpagedevice',
-        'currentuserparams', 'currentsystemparams')
+  options_dump: Tuple[bytes, ...] = (b'systemdict', b'statusdict', b'userdict', b'globaldict',
+        b'serverdict', b'errordict', b'internaldict', b'currentpagedevice',
+        b'currentuserparams', b'currentsystemparams')
 
   def complete_dump(self, text, line, begidx, endidx):
     return [cat for cat in self.options_dump if cat.startswith(text)]
@@ -880,86 +881,87 @@ class postscript(printer):
       # self.chitchat("No dictionary given - dumping everything (might take some time)")
       return self.onecmd("help dump")
     # recursively dump contents of a postscript dictionary and convert them to json
-    str_send = '/superdict {<< /universe countdictstack array dictstack >>} def\n'  \
-               '/strcat {exch dup length 2 index length add string dup\n'           \
-               'dup 4 2 roll copy length 4 -1 roll putinterval} def\n'              \
-               '/remove {exch pop () exch 3 1 roll exch strcat strcat} def\n'       \
-               '/escape { {(")   search {remove}{exit} ifelse} loop \n'             \
-               '          {(/)   search {remove}{exit} ifelse} loop \n'             \
-               r'          {(\\\) search {remove}{exit} ifelse} loop } def\n'        \
-               '/clones 220 array def /counter 0 def % performance drawback\n'      \
-               '/redundancy { /redundant false def\n'                               \
-               '  clones {exch dup 3 1 roll eq {/redundant true def} if} forall\n'  \
-               '  redundant not {\n'                                                \
-               '  dup clones counter 3 2 roll put  % put item into clonedict\n'     \
-               '  /counter counter 1 add def       % auto-increment counter\n'      \
-               '  } if redundant} def              % return true or false\n'        \
-               '/wd {redundancy {pop q (<redundant dict>) p q bc s}\n'              \
-               '{bo n {t exch q 128 a q c dump n} forall bc bc s} ifelse } def\n'   \
-               '/wa {q q bc s} def\n'                                               \
-               '% /wa {ao n {t dump n} forall ac bc s} def\n'                       \
-               '/n  {(\\n) print} def               % newline\n'                    \
-               '/t  {(\\t) print} def               % tabulator\n'                  \
-               '/bo {({)   print} def              % bracket open\n'                \
-               '/bc {(})   print} def              % bracket close\n'               \
-               '/ao {([)   print} def              % array open\n'                  \
-               '/ac {(])   print} def              % array close\n'                 \
-               '/q  {(")   print} def              % quote\n'                       \
-               '/s  {(,)   print} def              % comma\n'                       \
-               '/c  {(: )  print} def              % colon\n'                       \
-               '/p  {                  print} def  % print string\n'                \
-               '/a  {string cvs        print} def  % print any\n'                   \
-               '/pe {escape            print} def  % print escaped string\n'        \
-               '/ae {string cvs escape print} def  % print escaped any\n'           \
-               '/perms { readable  {(r) p}{(-) p} ifelse\n'                         \
-               '         writeable {(w) p}{(-) p} ifelse } def\n'                   \
-               '/rwcheck { % readable/writeable check\n'                            \
-               '  dup rcheck not {/readable  false def} if\n'                       \
-               '  dup wcheck not {/writeable false def} if perms } def\n'           \
-               '/dump {\n'                                                          \
-               '  /readable true def /writeable true def\n'                         \
-               '  dup type bo ("type": ) p q 16 a q s\n'                            \
-               '  %%%% check permissions %%%\n'                                     \
-               '  ( "perms": ) p q\n'                                               \
-               '  dup type /stringtype eq {rwcheck} {\n'                            \
-               '    dup type /dicttype eq {rwcheck} {\n'                            \
-               '      dup type /arraytype eq {rwcheck} {\n'                         \
-               '        dup type /packedarraytype eq {rwcheck} {\n'                 \
-               '          dup type /filetype eq {rwcheck} {\n'                      \
-               '            perms } % inherit perms from parent\n'                  \
-               '          ifelse} ifelse} ifelse} ifelse} ifelse\n'                 \
-               '  dup xcheck {(x) p}{(-) p} ifelse\n'                               \
-               '  %%%% convert values to strings %%%\n'                             \
-               '  q s ( "value": ) p\n'                                             \
-               '  %%%% on invalidaccess %%%\n'                                      \
-               '  readable false eq {pop q (<access denied>) p q bc s}{\n'          \
-               '  dup type /integertype     eq {q  12        a q bc s}{\n'          \
-               '  dup type /operatortype    eq {q 128       ae q bc s}{\n'          \
-               '  dup type /stringtype      eq {q           pe q bc s}{\n'          \
-               '  dup type /booleantype     eq {q   5        a q bc s}{\n'          \
-               '  dup type /dicttype        eq {            wd       }{\n'          \
-               '  dup type /arraytype       eq {            wa       }{\n'          \
-               '  dup type /packedarraytype eq {            wa       }{\n'          \
-               '  dup type /nametype        eq {q 128       ae q bc s}{\n'          \
-               '  dup type /fonttype        eq {q  30       ae q bc s}{\n'          \
-               '  dup type /nulltype        eq {q pop (null) p q bc s}{\n'          \
-               '  dup type /realtype        eq {q  42        a q bc s}{\n'          \
-               '  dup type /filetype        eq {q 100       ae q bc s}{\n'          \
-               '  dup type /marktype        eq {q 128       ae q bc s}{\n'          \
-               '  dup type /savetype        eq {q 128       ae q bc s}{\n'          \
-               '  dup type /gstatetype      eq {q 128       ae q bc s}{\n'          \
-               '  (<cannot handle>) p}\n'                                           \
-               '  ifelse} ifelse} ifelse} ifelse} ifelse} ifelse} ifelse} ifelse}\n'\
-               '  ifelse} ifelse} ifelse} ifelse} ifelse} ifelse} ifelse} ifelse}\n'\
-               'def\n'
-    if not resource: str_send += '(' + dict + ') where {'
-    str_send += 'bo 1183615869 ' + dict + ' {exch q 128 a q c dump n} forall bc'
-    if not resource: str_send += '}{(<nonexistent>) print} ifelse'
-    str_recv = self.clean_json(self.cmd(str_send))
-    if str_recv == '<nonexistent>':
+    bytes_send: bytes = \
+      b'/superdict {<< /universe countdictstack array dictstack >>} def\n'  \
+      b'/strcat {exch dup length 2 index length add string dup\n'           \
+      b'dup 4 2 roll copy length 4 -1 roll putinterval} def\n'              \
+      b'/remove {exch pop () exch 3 1 roll exch strcat strcat} def\n'       \
+      b'/escape { {(")   search {remove}{exit} ifelse} loop \n'             \
+      b'          {(/)   search {remove}{exit} ifelse} loop \n'             \
+      br'          {(\\\) search {remove}{exit} ifelse} loop } def\n'        \
+      b'/clones 220 array def /counter 0 def % performance drawback\n'      \
+      b'/redundancy { /redundant false def\n'                               \
+      b'  clones {exch dup 3 1 roll eq {/redundant true def} if} forall\n'  \
+      b'  redundant not {\n'                                                \
+      b'  dup clones counter 3 2 roll put  % put item into clonedict\n'     \
+      b'  /counter counter 1 add def       % auto-increment counter\n'      \
+      b'  } if redundant} def              % return true or false\n'        \
+      b'/wd {redundancy {pop q (<redundant dict>) p q bc s}\n'              \
+      b'{bo n {t exch q 128 a q c dump n} forall bc bc s} ifelse } def\n'   \
+      b'/wa {q q bc s} def\n'                                               \
+      b'% /wa {ao n {t dump n} forall ac bc s} def\n'                       \
+      b'/n  {(\\n) print} def               % newline\n'                    \
+      b'/t  {(\\t) print} def               % tabulator\n'                  \
+      b'/bo {({)   print} def              % bracket open\n'                \
+      b'/bc {(})   print} def              % bracket close\n'               \
+      b'/ao {([)   print} def              % array open\n'                  \
+      b'/ac {(])   print} def              % array close\n'                 \
+      b'/q  {(")   print} def              % quote\n'                       \
+      b'/s  {(,)   print} def              % comma\n'                       \
+      b'/c  {(: )  print} def              % colon\n'                       \
+      b'/p  {                  print} def  % print string\n'                \
+      b'/a  {string cvs        print} def  % print any\n'                   \
+      b'/pe {escape            print} def  % print escaped string\n'        \
+      b'/ae {string cvs escape print} def  % print escaped any\n'           \
+      b'/perms { readable  {(r) p}{(-) p} ifelse\n'                         \
+      b'         writeable {(w) p}{(-) p} ifelse } def\n'                   \
+      b'/rwcheck { % readable/writeable check\n'                            \
+      b'  dup rcheck not {/readable  false def} if\n'                       \
+      b'  dup wcheck not {/writeable false def} if perms } def\n'           \
+      b'/dump {\n'                                                          \
+      b'  /readable true def /writeable true def\n'                         \
+      b'  dup type bo ("type": ) p q 16 a q s\n'                            \
+      b'  %%%% check permissions %%%\n'                                     \
+      b'  ( "perms": ) p q\n'                                               \
+      b'  dup type /stringtype eq {rwcheck} {\n'                            \
+      b'    dup type /dicttype eq {rwcheck} {\n'                            \
+      b'      dup type /arraytype eq {rwcheck} {\n'                         \
+      b'        dup type /packedarraytype eq {rwcheck} {\n'                 \
+      b'          dup type /filetype eq {rwcheck} {\n'                      \
+      b'            perms } % inherit perms from parent\n'                  \
+      b'          ifelse} ifelse} ifelse} ifelse} ifelse\n'                 \
+      b'  dup xcheck {(x) p}{(-) p} ifelse\n'                               \
+      b'  %%%% convert values to strings %%%\n'                             \
+      b'  q s ( "value": ) p\n'                                             \
+      b'  %%%% on invalidaccess %%%\n'                                      \
+      b'  readable false eq {pop q (<access denied>) p q bc s}{\n'          \
+      b'  dup type /integertype     eq {q  12        a q bc s}{\n'          \
+      b'  dup type /operatortype    eq {q 128       ae q bc s}{\n'          \
+      b'  dup type /stringtype      eq {q           pe q bc s}{\n'          \
+      b'  dup type /booleantype     eq {q   5        a q bc s}{\n'          \
+      b'  dup type /dicttype        eq {            wd       }{\n'          \
+      b'  dup type /arraytype       eq {            wa       }{\n'          \
+      b'  dup type /packedarraytype eq {            wa       }{\n'          \
+      b'  dup type /nametype        eq {q 128       ae q bc s}{\n'          \
+      b'  dup type /fonttype        eq {q  30       ae q bc s}{\n'          \
+      b'  dup type /nulltype        eq {q pop (null) p q bc s}{\n'          \
+      b'  dup type /realtype        eq {q  42        a q bc s}{\n'          \
+      b'  dup type /filetype        eq {q 100       ae q bc s}{\n'          \
+      b'  dup type /marktype        eq {q 128       ae q bc s}{\n'          \
+      b'  dup type /savetype        eq {q 128       ae q bc s}{\n'          \
+      b'  dup type /gstatetype      eq {q 128       ae q bc s}{\n'          \
+      b'  (<cannot handle>) p}\n'                                           \
+      b'  ifelse} ifelse} ifelse} ifelse} ifelse} ifelse} ifelse} ifelse}\n'\
+      b'  ifelse} ifelse} ifelse} ifelse} ifelse} ifelse} ifelse} ifelse}\n'\
+      b'def\n'
+    if not resource: bytes_send +=  b'(' + dict +  b') where {'
+    bytes_send += b'bo 1183615869 ' + dict + b' {exch q 128 a q c dump n} forall bc'
+    if not resource: bytes_send += b'}{(<nonexistent>) print} ifelse'
+    bytes_recv = self.clean_json(self.cmd(bytes_send))
+    if bytes_recv == '<nonexistent>':
       output().info("Dictionary not found")
     else: # convert ps dictionary to json
-      return json.loads(str_recv, object_pairs_hook=collections.OrderedDict, strict=False)
+      return json.loads(bytes_recv, object_pairs_hook=collections.OrderedDict, strict=False)
 
   # bad practice
   def clean_json(self, data: bytes) -> bytes:
@@ -970,15 +972,16 @@ class postscript(printer):
   # ------------------------[ resource <category> [dump] ]--------------
   def do_resource(self, arg: str):
     args = re.split(r"\s+", arg, 1)
-    cat, dump = args[0], len(args) > 1
+    cat, dump = args[0].encode(), len(args) > 1
     self.populate_resource()
     if cat in self.options_resource:
-      str_send = '(*) {128 string cvs print (\\n) print}'\
-                 ' 128 string /' + cat + ' resourceforall'
-      items = self.cmd(str_send).splitlines()
+      cat: bytes
+      bytes_send = b'(*) {128 string cvs print (\\n) print}'\
+                   b' 128 string /' + cat + b' resourceforall'
+      items = self.cmd(bytes_send).splitlines()
       for item in sorted(items):
         output().info(item)
-        if dump: self.do_dump(b'/' + item + b' /' + cat.encode() + b' findresource', True)
+        if dump: self.do_dump((b'/' + item + b' /' + cat + b' findresource').decode(), True)
     else:
       self.onecmd("help resource")
 
@@ -997,45 +1000,45 @@ class postscript(printer):
   # retrieve available resources
   def populate_resource(self):
     if not self.options_resource:
-      str_send = '(*) {print (\\n) print} 128 string /Category resourceforall'
-      self.options_resource = self.cmd(str_send).splitlines()
+      bytes_send = b'(*) {print (\\n) print} 128 string /Category resourceforall'
+      self.options_resource = self.cmd(bytes_send).splitlines()
 
   # ------------------------[ set <key=value> ]-------------------------
   def do_set(self, arg: str):
     "Set key to value in topmost dictionary:  set <key=value>"
-    args = re.split("=", arg, 1)
+    args = re.split(rb"=", arg.encode(), 1)
     if len(args) > 1:
       key, val = args
       # make changes permanent
-      str_send = 'true 0 startjob {\n'
+      bytes_send = b'true 0 startjob {\n'
       # flavor No.1: put (associate key with value in dict)
-      str_send += '/' + key + ' where {/' + key + ' ' + val + ' put} if\n'
+      bytes_send += b'/' + key + b' where {/' + key + b' ' + val + b' put} if\n'
       # flavor No.2: store (replace topmost definition of key)
-      str_send += '/' + key + ' ' + val + ' store\n'
+      bytes_send += b'/' + key + b' ' + val + b' store\n'
       # flavor No.3: def (associate key and value in userdict)
-      str_send += '/' + key + ' ' + val + ' def\n'
+      bytes_send += b'/' + key + b' ' + val + b' def\n'
       # ignore invalid access
-      str_send += '} 1183615869 internaldict /superexec get exec'
-      self.cmd(str_send, False)
+      bytes_send += b'} 1183615869 internaldict /superexec get exec'
+      self.cmd(bytes_send, False)
     else:
       self.onecmd("help set")
 
   # ------------------------[ config <setting> ]------------------------
   def do_config(self, arg: str):
     args = re.split(r"\s+", arg, 1)
-    (arg, val) = tuple(args) if len(args) > 1 else (args[0], None)
-    if arg in list(self.options_config.keys()):
-      key = self.options_config[arg]
-      if arg == 'copies' and not val: return self.help_config()
+    (a, val) = tuple(args) if len(args) > 1 else (args[0], None)
+    if a in list(self.options_config.keys()):
+      key = self.options_config[a]
+      if a == 'copies' and not val: return self.help_config()
       output().psonly()
       val = val or 'currentpagedevice /' + key + ' get not'
       output().info(self.globalcmd(
-        'currentpagedevice /' + key + ' known\n'
-        '{<< /' + key + ' ' + val + ' >> setpagedevice\n'
-        '(' + key + ' ) print currentpagedevice /' + key + ' get\n'
-        'dup type /integertype eq {(= ) print 8 string cvs print}\n'
-        '{{(enabled)}{(disabled)} ifelse print} ifelse}\n'
-        '{(Not available) print} ifelse'))
+        b'currentpagedevice /' + key.encode() + b' known\n'
+        b'{<< /' + key.encode() + b' ' + val.encode() + b' >> setpagedevice\n'
+        b'(' + key.encode() + b' ) print currentpagedevice /' + key.encode() + b' get\n'
+        b'dup type /integertype eq {(= ) print 8 string cvs print}\n'
+        b'{{(enabled)}{(disabled)} ifelse print} ifelse}\n'
+        b'{(Not available) print} ifelse'))
     else:
       self.help_config()
 

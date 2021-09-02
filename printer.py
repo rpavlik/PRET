@@ -4,7 +4,7 @@
 # python standard library
 import re, os, sys, cmd, glob, errno, random, ntpath
 import posixpath, hashlib, tempfile, subprocess, abc
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 # local pret classes
 from helper import log, output, conv, file, item, conn, const as c
@@ -223,7 +223,7 @@ class printer(cmd.Cmd):
     self.set_prompt()
 
   # ------------------------[ timeout <seconds> ]-----------------------
-  def do_timeout(self, arg: str, quiet=False):
+  def do_timeout(self, arg: Union[str, float], quiet=False):
     "Set connection timeout:  timeout <seconds>"
     try:
       if arg:
@@ -235,21 +235,21 @@ class printer(cmd.Cmd):
       output().errmsg("Cannot set timeout", e)
 
   # send mode-specific command whith modified timeout
-  def timeoutcmd(self, str_send, timeout, *stuff):
+  def timeoutcmd(self, bytes_send: bytes, timeout, *stuff):
     timeout_old = self.timeout
     self.do_timeout(timeout, True)
-    str_recv = self.cmd(str_send, *stuff)
+    bytes_recv = self.cmd(bytes_send, *stuff)
     self.do_timeout(timeout_old, True)
-    return str_recv
+    return bytes_recv
 
   @abc.abstractmethod
-  def cmd(self, str_send, **kwargs):
+  def cmd(self, bytes_send, **kwargs):
     raise NotImplementedError
 
   # ------------------------[ reconnect ]-------------------------------
   def do_reconnect(self, *arg):
     self.do_close()
-    self.do_open(self.target, 'reconnect')
+    self.do_open(self.target.decode(), 'reconnect')
 
   # re-open connection
   def reconnect(self, msg):
@@ -258,7 +258,7 @@ class printer(cmd.Cmd):
     sys.stdout.write(os.linesep + "Forcing reconnect. ")
     # workaround to flush socket buffers
     self.do_close()
-    self.do_open(self.target, 'reconnect')
+    self.do_open(self.target.decode(), 'reconnect')
     # on CTRL+C spawn a new shell
     if not msg: self.cmdloop(intro="")
 
@@ -289,7 +289,7 @@ class printer(cmd.Cmd):
       print("Volume not available")
 
   # set volume
-  def set_vol(self, vol=""):
+  def set_vol(self, vol: bytes=b""):
     if not vol:
       # set default volumes
       if self.mode == 'ps' : vol = c.PS_VOL
@@ -425,9 +425,9 @@ class printer(cmd.Cmd):
     if not lpath:
       lpath = self.basename(arg)
     path = self.rpath(arg.encode()) if r else arg.encode()
-    str_recv = self.get(path)
-    if str_recv != c.NONEXISTENT:
-      rsize, data = str_recv
+    bytes_recv = self.get(path)
+    if bytes_recv != c.NONEXISTENT:
+      rsize, data = bytes_recv
       lsize = len(data)
       # fix carriage return chars added by some devices
       if lsize != rsize and len(conv().nstrip_bytes(data)) == rsize:
@@ -453,7 +453,7 @@ class printer(cmd.Cmd):
       arg = eval(input("Local file: "))
     if not rpath:
       rpath = os.path.basename(arg)
-    rpath = self.rpath(rpath)
+    rpath = self.rpath(rpath.encode())
     lpath = os.path.abspath(arg)
     # read from local file
     data = file().read(lpath)
@@ -510,9 +510,9 @@ class printer(cmd.Cmd):
     if not arg:
       arg = eval(input("Remote file: "))
     path = self.rpath(arg.encode())
-    str_recv = self.get(path)
-    if str_recv != c.NONEXISTENT:
-      rsize, data = str_recv
+    bytes_recv = self.get(path)
+    if bytes_recv != c.NONEXISTENT:
+      rsize, data = bytes_recv
       output().raw(data.strip())
 
   # ------------------------[ edit <file> ]-----------------------------
@@ -570,7 +570,7 @@ class printer(cmd.Cmd):
     elif size: # download current file
       output().raw(self.vol + name + b" -> " + lpath)
       self.makedirs(os.path.dirname(lpath))
-      self.do_get(self.vol + name, lpath, False)
+      self.do_get((self.vol + name).decode(), lpath, False)
     else:      # create current directory
       self.chitchat("Traversing " + name.decode())
       self.makedirs(lpath)
@@ -765,8 +765,8 @@ class printer(cmd.Cmd):
     "Execute custom command on printer:  site <command>"
     if not arg:
       arg = eval(input("Command: "))
-    str_recv = self.cmd(arg)
-    output().info(str_recv)
+    bytes_recv = self.cmd(arg)
+    output().info(bytes_recv)
 
   # ------------------------[ print <file>|"text" ]----------------------------
   def do_print(self, arg: str):

@@ -6,6 +6,7 @@
 from socket import socket
 import sys, os, re, stat, math, time, datetime
 import importlib
+from typing import Tuple
 
 # third party modules
 try: # unicode monkeypatch for windoze
@@ -175,7 +176,7 @@ class output():
     print("- %8s   %s %s %s" % (size, mtime, id, name))
 
   # show output from df
-  def df(self, args):
+  def df(self, args: Tuple[str, ...]):
     self.info("%-16s %-11s %-11s %-9s %-10s %-8s %-9s %-10s %-10s" % args)
 
   # show fuzzing results
@@ -531,7 +532,7 @@ class const(): # define constants
                 b'/== {128 string cvs print (\\n) print} def\n'
   PCL_HEADER  = b'@PJL ENTER LANGUAGE = PCL' + EOL + ESC
   #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  SUPERBLOCK  = '31337' # define super macro id to contain pclfs table
+  SUPERBLOCK  = b'31337' # define super macro id to contain pclfs table
   BLOCKRANGE  = list(range(10000,20000)) # use those macros for file content
   FILE_EXISTS = -1 # file size to be returned if file/dir size unknown
   NONEXISTENT = -2 # file size to be returned if a file does not exist
